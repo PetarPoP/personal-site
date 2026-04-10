@@ -22,5 +22,9 @@ export const loadGithubRepos = async (): Promise<LoadGithubReposResult> => {
   if (!result.success) {
     return result;
   }
-  return { success: true, repos: result.data.repos };
+  const data = result.data;
+  if (!data) {
+    return { success: false, error: "Invalid response format." };
+  }
+  return { success: true, repos: data.repos };
 };

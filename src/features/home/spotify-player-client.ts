@@ -24,7 +24,11 @@ export const loadSpotifyPlayer = async (): Promise<LoadSpotifyPlayerResult> => {
   if (!result.success) {
     return result;
   }
-  return { success: true, player: result.data.player };
+  const data = result.data;
+  if (!data) {
+    return { success: false, error: "Invalid Spotify response format." };
+  }
+  return { success: true, player: data.player };
 };
 
 export const controlSpotifyPlayer = async (action: SpotifyPlayerAction): Promise<{ success: true } | { success: false; error: string }> => {

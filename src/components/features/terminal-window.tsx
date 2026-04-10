@@ -112,8 +112,9 @@ export function TerminalWindow({
                   if (data.clear) {
                     setLines([]);
                   }
-                  if (data.output && data.output.length > 0) {
-                    setLines((prev) => [...prev, data.output]);
+                  const output = data.output;
+                  if (typeof output === "string" && output.length > 0) {
+                    setLines((prev) => [...prev, output]);
                   }
                   if ((data.exitCode ?? 0) !== 0) {
                     setLines((prev) => [...prev, `[exit ${data.exitCode}]`]);
