@@ -1,6 +1,8 @@
 "use client";
 
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import dynamic from "next/dynamic";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,22 +15,47 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Toaster, toast } from "sonner";
 import { FileIconCard } from "@/components/features/file-icon-card";
-import { MailerWindow } from "@/components/features/mailer-window";
-import { PdfViewerWindow } from "@/components/features/pdf-viewer-window";
-import { SpotifyWindow } from "@/components/features/spotify-window";
-import { TerminalWindow } from "@/components/features/terminal-window";
-import { TextEditorWindow } from "@/components/features/text-editor-window";
+import { HomeDock } from "@/features/home/_components/home-dock";
+import { HomeTopBar } from "@/features/home/_components/home-top-bar";
 import { useHomePageController } from "@/features/home/use-home-page-controller";
 import type { ExplorerPath } from "@/features/home/types";
+
+const MailerWindow = dynamic(() => import("@/components/features/mailer-window").then((mod) => mod.MailerWindow));
+const PdfViewerWindow = dynamic(() => import("@/components/features/pdf-viewer-window").then((mod) => mod.PdfViewerWindow));
+const SpotifyWindow = dynamic(() => import("@/components/features/spotify-window").then((mod) => mod.SpotifyWindow));
+const TerminalWindow = dynamic(() => import("@/components/features/terminal-window").then((mod) => mod.TerminalWindow));
+const TextEditorWindow = dynamic(() => import("@/components/features/text-editor-window").then((mod) => mod.TextEditorWindow));
 
 type HomeDesktopPageProps = {
   initialExplorerPath?: ExplorerPath | null;
 };
+type ResizeDirection = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageProps) {
   const DESKTOP_ICON_WIDTH = 80;
   const DESKTOP_ICON_HEIGHT = 84;
+  const EXPLORER_MIN_WIDTH = 560;
+  const EXPLORER_MIN_HEIGHT = 430;
+  const EXPLORER_COMPACT_BREAKPOINT = 760;
   const [explorerOffset, setExplorerOffset] = useState({ x: 0, y: 0 });
+  const [explorerOffsetBeforeMaximize, setExplorerOffsetBeforeMaximize] = useState({ x: 0, y: 0 });
+  const [explorerSize, setExplorerSize] = useState<{ width: number | null; height: number | null }>({
+    width: null,
+    height: null,
+  });
+  const [explorerSizeBeforeMaximize, setExplorerSizeBeforeMaximize] = useState<{ width: number | null; height: number | null }>({
+    width: null,
+    height: null,
+  });
+  const [explorerMaximizeFromRect, setExplorerMaximizeFromRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [isExplorerMaximized, setIsExplorerMaximized] = useState(false);
+  const [isExplorerCompact, setIsExplorerCompact] = useState(false);
+  const [isExplorerPlacesMenuOpen, setIsExplorerPlacesMenuOpen] = useState(false);
   const [settingsOffset, setSettingsOffset] = useState({ x: 0, y: 0 });
   const [isAppLoading, setIsAppLoading] = useState(false);
   const [isWindowHeaderDragging, setIsWindowHeaderDragging] = useState(false);
@@ -42,6 +69,15 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
   const [hoveredDockIndex, setHoveredDockIndex] = useState<number | null>(null);
   const [isClockMenuOpen, setIsClockMenuOpen] = useState(false);
   const explorerDrag = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
+  const explorerResize = useRef<{
+    direction: ResizeDirection;
+    startX: number;
+    startY: number;
+    baseX: number;
+    baseY: number;
+    baseWidth: number;
+    baseHeight: number;
+  } | null>(null);
   const settingsDrag = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
   const clockMenuRef = useRef<HTMLDivElement | null>(null);
   const explorerContentRef = useRef<HTMLDivElement | null>(null);
@@ -87,7 +123,6 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
     awaitingBootReveal,
     bootTextFadeOut,
     isDarkTheme,
-    isExitingFullscreen,
     isExplorerClosing,
     isExplorerOpen,
     isMailerClosing,
@@ -169,7 +204,6 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
     setSelectedExplorerItem,
     setShowUnsavedDialog,
     setTheme,
-    toggleFullscreen,
     bringWindowToFront,
     completeBoot,
   } = actions;
@@ -239,6 +273,113 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
       setIsProjectsTreeOpen(false);
     }, 190);
   };
+  const toggleExplorerMaximized = () => {
+    if (isExplorerMaximized) {
+      setIsExplorerMaximized(false);
+      setExplorerOffset(explorerOffsetBeforeMaximize);
+      setExplorerSize(explorerSizeBeforeMaximize);
+      return;
+    }
+    if (explorerRef.current) {
+      const rect = explorerRef.current.getBoundingClientRect();
+      setExplorerMaximizeFromRect({
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      });
+    }
+    setExplorerOffsetBeforeMaximize(explorerOffset);
+    setExplorerSizeBeforeMaximize(explorerSize);
+    setIsExplorerMaximized(true);
+    explorerDrag.current = null;
+    explorerResize.current = null;
+    setIsWindowHeaderDragging(false);
+  };
+  useEffect(() => {
+    if (!isExplorerMaximized || !explorerMaximizeFromRect) {
+      return;
+    }
+    const raf = window.requestAnimationFrame(() => {
+      setExplorerMaximizeFromRect(null);
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [explorerMaximizeFromRect, isExplorerMaximized]);
+
+  useEffect(() => {
+    if (!isExplorerOpen || isExplorerMaximized || !explorerRef.current) {
+      return;
+    }
+    const rect = explorerRef.current.getBoundingClientRect();
+    setExplorerOffset({
+      x: Math.max(0, (window.innerWidth - rect.width) / 2),
+      y: Math.max(0, (window.innerHeight - rect.height) / 2),
+    });
+  }, [isExplorerOpen, isExplorerMaximized, explorerRef]);
+
+  useEffect(() => {
+    if (!isExplorerOpen || !explorerRef.current) {
+      return;
+    }
+    const updateCompactMode = () => {
+      if (!explorerRef.current) {
+        return;
+      }
+      const width = explorerRef.current.getBoundingClientRect().width;
+      const compact = width < EXPLORER_COMPACT_BREAKPOINT;
+      setIsExplorerCompact(compact);
+      if (!compact) {
+        setIsExplorerPlacesMenuOpen(false);
+      }
+    };
+    updateCompactMode();
+    const observer = new ResizeObserver(updateCompactMode);
+    observer.observe(explorerRef.current);
+    return () => observer.disconnect();
+  }, [isExplorerOpen, EXPLORER_COMPACT_BREAKPOINT, explorerRef]);
+
+  const beginExplorerResize = (direction: ResizeDirection, event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || isExplorerMaximized || !explorerRef.current) {
+      return;
+    }
+    event.stopPropagation();
+    const rect = explorerRef.current.getBoundingClientRect();
+    explorerResize.current = {
+      direction,
+      startX: event.clientX,
+      startY: event.clientY,
+      baseX: explorerOffset.x,
+      baseY: explorerOffset.y,
+      baseWidth: rect.width,
+      baseHeight: rect.height,
+    };
+    setIsWindowHeaderDragging(true);
+  };
+  const beginExplorerDragFromMaximized = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const restoredWidth = Math.max(
+      EXPLORER_MIN_WIDTH,
+      explorerSizeBeforeMaximize.width ?? Math.min(1100, Math.floor(viewportWidth * 0.82)),
+    );
+    const restoredHeight = Math.max(
+      EXPLORER_MIN_HEIGHT,
+      explorerSizeBeforeMaximize.height ?? Math.min(760, Math.floor(viewportHeight * 0.82)),
+    );
+    const cursorRatio = Math.max(0, Math.min(1, event.clientX / Math.max(1, viewportWidth)));
+    const nextX = Math.max(0, Math.min(viewportWidth - restoredWidth, event.clientX - restoredWidth * cursorRatio));
+    const nextY = Math.max(0, Math.min(viewportHeight - restoredHeight, event.clientY - 18));
+    setIsExplorerMaximized(false);
+    setExplorerSize({ width: restoredWidth, height: restoredHeight });
+    setExplorerOffset({ x: nextX, y: nextY });
+    explorerDrag.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      baseX: nextX,
+      baseY: nextY,
+    };
+    setIsWindowHeaderDragging(true);
+  };
 
   useEffect(() => {
     if (activePlace === "home") {
@@ -260,6 +401,16 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
       window.clearTimeout(timer);
     };
   }, [activePlace]);
+  useEffect(() => {
+    if (!isExplorerOpen || activePlace !== "home") {
+      return;
+    }
+    const id = window.setTimeout(() => {
+      setIsHomeTreeMounted(true);
+      setIsHomeTreeOpen(true);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [activePlace, isExplorerOpen]);
 
   useEffect(() => {
     const onPointerMove = (event: PointerEvent) => {
@@ -338,6 +489,37 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
         explorerDrag.current = null;
         setIsWindowHeaderDragging(false);
       }
+      if (explorerResize.current && event.buttons === 1) {
+        const deltaX = event.clientX - explorerResize.current.startX;
+        const deltaY = event.clientY - explorerResize.current.startY;
+        const hasWest = explorerResize.current.direction.includes("w");
+        const hasEast = explorerResize.current.direction.includes("e");
+        const hasNorth = explorerResize.current.direction.includes("n");
+        const hasSouth = explorerResize.current.direction.includes("s");
+        let nextWidth = explorerResize.current.baseWidth;
+        let nextHeight = explorerResize.current.baseHeight;
+        let nextX = explorerResize.current.baseX;
+        let nextY = explorerResize.current.baseY;
+        if (hasEast) {
+          nextWidth = Math.max(EXPLORER_MIN_WIDTH, explorerResize.current.baseWidth + deltaX);
+        }
+        if (hasWest) {
+          nextWidth = Math.max(EXPLORER_MIN_WIDTH, explorerResize.current.baseWidth - deltaX);
+          nextX = explorerResize.current.baseX + (explorerResize.current.baseWidth - nextWidth);
+        }
+        if (hasSouth) {
+          nextHeight = Math.max(EXPLORER_MIN_HEIGHT, explorerResize.current.baseHeight + deltaY);
+        }
+        if (hasNorth) {
+          nextHeight = Math.max(EXPLORER_MIN_HEIGHT, explorerResize.current.baseHeight - deltaY);
+          nextY = explorerResize.current.baseY + (explorerResize.current.baseHeight - nextHeight);
+        }
+        setExplorerSize({ width: nextWidth, height: nextHeight });
+        setExplorerOffset({ x: nextX, y: nextY });
+      } else if (explorerResize.current && event.buttons !== 1) {
+        explorerResize.current = null;
+        setIsWindowHeaderDragging(false);
+      }
       if (settingsDrag.current && event.buttons === 1) {
         const deltaX = event.clientX - settingsDrag.current.startX;
         const deltaY = event.clientY - settingsDrag.current.startY;
@@ -368,6 +550,7 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
       setDesktopSelectionBox(null);
       setExplorerSelectionBox(null);
       explorerDrag.current = null;
+      explorerResize.current = null;
       settingsDrag.current = null;
       setIsWindowHeaderDragging(false);
     };
@@ -378,7 +561,7 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     };
-  }, [DESKTOP_ICON_HEIGHT, DESKTOP_ICON_WIDTH, desktopApps, desktopAreaRef, setSelectedAppId, setSelectedExplorerItem]);
+  }, [DESKTOP_ICON_HEIGHT, DESKTOP_ICON_WIDTH, EXPLORER_MIN_HEIGHT, EXPLORER_MIN_WIDTH, desktopApps, desktopAreaRef, setSelectedAppId, setSelectedExplorerItem]);
 
   useEffect(() => {
     return () => {
@@ -459,30 +642,6 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
   }, [isClockMenuOpen]);
 
   useEffect(() => {
-    if (!isAppLoading) {
-      document.body.classList.remove("app-loading-cursor");
-      return;
-    }
-    document.body.classList.add("app-loading-cursor");
-    return () => {
-      document.body.classList.remove("app-loading-cursor");
-    };
-  }, [isAppLoading]);
-
-  useEffect(() => {
-    const shouldDisableSelection =
-      draggingId !== null || desktopSelectionBox !== null || explorerSelectionBox !== null || isWindowHeaderDragging;
-    if (!shouldDisableSelection) {
-      document.body.classList.remove("disable-text-selection");
-      return;
-    }
-    document.body.classList.add("disable-text-selection");
-    return () => {
-      document.body.classList.remove("disable-text-selection");
-    };
-  }, [desktopSelectionBox, draggingId, explorerSelectionBox, isWindowHeaderDragging]);
-
-  useEffect(() => {
     if (!awaitingBootReveal) {
       return;
     }
@@ -490,9 +649,15 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
       completeBoot();
     }
   }, [awaitingBootReveal, completeBoot]);
+  const shouldDisableSelection =
+    draggingId !== null || desktopSelectionBox !== null || explorerSelectionBox !== null || isWindowHeaderDragging;
 
   return (
-    <div className={`relative min-h-screen overflow-hidden ${theme === "dark" ? "bg-[#25104f] text-white" : "bg-[#d5c9ef] text-[#1d1630]"}`}>
+    <div
+      className={`relative min-h-screen overflow-hidden ${theme === "dark" ? "bg-[#25104f] text-white" : "bg-[#d5c9ef] text-[#1d1630]"} ${
+        isAppLoading ? "app-loading-cursor" : ""
+      } ${shouldDisableSelection ? "disable-text-selection" : ""}`}
+    >
       <div
         className={`absolute inset-0 ${
           theme === "dark"
@@ -563,30 +728,15 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
       ) : null}
 
       <main className="relative z-10 grid min-h-screen grid-rows-[auto_1fr_auto]">
-        <header className={`flex items-center justify-between border-b px-4 py-2 text-xs backdrop-blur-md sm:px-6 ${theme === "dark" ? "border-black/20 bg-black/30" : "border-black/10 bg-white/35"}`}>
-          <span className="font-medium">popOS</span>
-          <span>pop@desktop: ~</span>
-          <div ref={clockMenuRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setIsClockMenuOpen((prev) => !prev)}
-              className={`cursor-pointer rounded-md px-2 py-1 font-medium transition-colors ${theme === "dark" ? "hover:bg-white/15" : "hover:bg-black/10"}`}
-            >
-              {clock}
-            </button>
-            {isClockMenuOpen ? (
-              <div
-                className={`absolute right-0 top-9 min-w-56 rounded-xl border p-3 text-right shadow-2xl backdrop-blur-md ${theme === "dark" ? "border-white/20 bg-[#1c2236]/95 text-white" : "border-black/15 bg-[#f4f0ff]/95 text-[#1d1830]"}`}
-              >
-                <p className={`text-[11px] uppercase tracking-wide ${theme === "dark" ? "text-white/60" : "text-[#5b5372]"}`}>
-                  system clock
-                </p>
-                <p className="mt-1 text-xl font-semibold">{menuTimeLabel}</p>
-                <p className={`mt-1 text-xs capitalize ${theme === "dark" ? "text-white/75" : "text-[#4b4462]"}`}>{menuDateLabel}</p>
-              </div>
-            ) : null}
-          </div>
-        </header>
+        <HomeTopBar
+          theme={theme}
+          clock={clock}
+          isClockMenuOpen={isClockMenuOpen}
+          clockMenuRef={clockMenuRef}
+          menuTimeLabel={menuTimeLabel}
+          menuDateLabel={menuDateLabel}
+          onToggleClockMenu={() => setIsClockMenuOpen((prev) => !prev)}
+        />
 
         <section
           ref={desktopAreaRef}
@@ -714,24 +864,57 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
 
           {isExplorerOpen ? (
             <div
-              className="pointer-events-none absolute inset-0 p-4 sm:p-10"
+              className={`pointer-events-none absolute inset-0 ${isExplorerMaximized ? "p-0" : "p-4 sm:p-10"}`}
               style={{ zIndex: windowZIndices.explorer }}
               onClick={(event) => event.stopPropagation()}
             >
               <div
                 ref={explorerRef}
-                className={`explorer-window pointer-events-auto ${isExitingFullscreen ? "fullscreen-exit" : ""} ${isExplorerClosing ? "window-close" : "window-open"} ${explorerFrame} mx-auto flex h-[76vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border shadow-2xl backdrop-blur-md`}
-                style={{ transform: `translate(${explorerOffset.x}px, ${explorerOffset.y}px)` }}
+                className={`explorer-window pointer-events-auto relative ${isExplorerMaximized ? "window-maximized" : "window-resizable"} ${isExplorerClosing ? "window-close" : "window-open"} ${explorerFrame} flex h-[76vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border shadow-2xl backdrop-blur-md`}
+                style={{
+                  transform: isExplorerMaximized ? "none" : `translate(${explorerOffset.x}px, ${explorerOffset.y}px)`,
+                  width: !isExplorerMaximized && explorerSize.width !== null ? `${explorerSize.width}px` : undefined,
+                  height: !isExplorerMaximized && explorerSize.height !== null ? `${explorerSize.height}px` : undefined,
+                  minWidth: !isExplorerMaximized ? `${EXPLORER_MIN_WIDTH}px` : undefined,
+                  minHeight: !isExplorerMaximized ? `${EXPLORER_MIN_HEIGHT}px` : undefined,
+                  position: isExplorerMaximized ? "fixed" : "absolute",
+                  inset: isExplorerMaximized ? "0" : undefined,
+                  left: !isExplorerMaximized ? "0" : undefined,
+                  top: !isExplorerMaximized ? "0" : undefined,
+                  margin: isExplorerMaximized ? 0 : undefined,
+                  zIndex: isExplorerMaximized ? 70 : undefined,
+                  ...(isExplorerMaximized && explorerMaximizeFromRect
+                    ? {
+                        inset: "auto",
+                        left: `${explorerMaximizeFromRect.left}px`,
+                        top: `${explorerMaximizeFromRect.top}px`,
+                        width: `${explorerMaximizeFromRect.width}px`,
+                        height: `${explorerMaximizeFromRect.height}px`,
+                      }
+                    : {}),
+                  transition: "transform 180ms ease, width 180ms ease, height 180ms ease, left 180ms ease, top 180ms ease",
+                }}
                 onMouseDown={() => bringWindowToFront("explorer")}
               >
                 <div
                   className={`flex cursor-move items-center justify-between border-b px-3 py-2 text-xs ${explorerHeader} ${explorerText}`}
+                  onDoubleClick={(event) => {
+                    const target = event.target as HTMLElement;
+                    if (target.closest("button") || target.closest("input")) {
+                      return;
+                    }
+                    toggleExplorerMaximized();
+                  }}
                   onPointerDown={(event) => {
                     if (event.button !== 0) {
                       return;
                     }
                     const target = event.target as HTMLElement;
                     if (target.closest("button") || target.closest("input")) {
+                      return;
+                    }
+                    if (isExplorerMaximized) {
+                      beginExplorerDragFromMaximized(event);
                       return;
                     }
                     explorerDrag.current = {
@@ -744,6 +927,15 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
                   }}
                 >
                   <div className="flex items-center gap-1">
+                    {isExplorerCompact ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsExplorerPlacesMenuOpen((prev) => !prev)}
+                        className={`cursor-pointer rounded px-2 py-1 ${explorerButton}`}
+                      >
+                        ☰
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={handleExplorerBack}
@@ -820,7 +1012,7 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={toggleFullscreen} className={`cursor-pointer rounded px-2 py-1 ${explorerButton}`}>
+                    <button type="button" onClick={toggleExplorerMaximized} className={`cursor-pointer rounded px-2 py-1 ${explorerButton}`}>
                       ⛶ {t.full}
                     </button>
                     <button
@@ -832,9 +1024,33 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
                     </button>
                   </div>
                 </div>
+                {!isExplorerMaximized ? (
+                  <>
+                    <div className="absolute left-0 top-0 bottom-0 z-30 w-2 cursor-w-resize" onPointerDown={(event) => beginExplorerResize("w", event)} />
+                    <div className="absolute right-0 top-0 bottom-0 z-30 w-2 cursor-e-resize" onPointerDown={(event) => beginExplorerResize("e", event)} />
+                    <div className="absolute top-0 left-0 right-0 z-30 h-2 cursor-n-resize" onPointerDown={(event) => beginExplorerResize("n", event)} />
+                    <div className="absolute bottom-0 left-0 right-0 z-30 h-2 cursor-s-resize" onPointerDown={(event) => beginExplorerResize("s", event)} />
+                    <div className="absolute left-0 top-0 z-40 h-3 w-3 cursor-nw-resize" onPointerDown={(event) => beginExplorerResize("nw", event)} />
+                    <div className="absolute right-0 top-0 z-40 h-3 w-3 cursor-ne-resize" onPointerDown={(event) => beginExplorerResize("ne", event)} />
+                    <div className="absolute left-0 bottom-0 z-40 h-3 w-3 cursor-sw-resize" onPointerDown={(event) => beginExplorerResize("sw", event)} />
+                    <div className="absolute right-0 bottom-0 z-40 h-3 w-3 cursor-se-resize" onPointerDown={(event) => beginExplorerResize("se", event)} />
+                  </>
+                ) : null}
 
-                <div className="flex flex-1 flex-col md:grid md:grid-cols-[220px_1fr]">
-                  <aside className={`h-fit border-b p-3 text-sm md:h-auto md:border-b-0 md:border-r ${explorerSidebar}`}>
+                <div className="relative flex flex-1 min-h-0">
+                  {isExplorerCompact && isExplorerPlacesMenuOpen ? (
+                    <button
+                      type="button"
+                      aria-label="Close places menu"
+                      onClick={() => setIsExplorerPlacesMenuOpen(false)}
+                      className="absolute inset-0 z-10 cursor-default bg-black/30"
+                    />
+                  ) : null}
+                  <aside
+                    className={`z-20 w-[220px] shrink-0 overflow-y-auto border-r p-3 text-sm transition-transform duration-200 ${explorerSidebar} ${
+                      isExplorerCompact ? `absolute inset-y-0 left-0 ${isExplorerPlacesMenuOpen ? "translate-x-0" : "-translate-x-full"}` : "relative translate-x-0"
+                    }`}
+                  >
                     <p className={`mb-2 text-xs uppercase tracking-wide ${explorerMuted}`}>{t.places}</p>
                     <ul className={`grid grid-cols-3 gap-1 md:grid-cols-1 md:space-y-1 ${explorerText}`}>
                       <li>
@@ -933,7 +1149,7 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
 
                   <div
                     ref={explorerContentRef}
-                    className={`relative p-4 overflow-auto ${explorerContent}`}
+                    className={`relative min-h-0 flex-1 overflow-auto p-4 ${explorerContent}`}
                     onPointerDown={(event) => {
                       if (event.button !== 0) {
                         return;
@@ -1213,7 +1429,7 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
                     ) : null}
                   </div>
                 </div>
-                <div className={`flex h-11 items-center justify-end gap-2 border-t px-4 ${explorerHeader}`}>
+                <div className={`flex h-11 shrink-0 items-center justify-end gap-2 border-t px-4 ${explorerHeader}`}>
                   <button
                     type="button"
                     onClick={() => {
@@ -1423,31 +1639,13 @@ export function HomeDesktopPage({ initialExplorerPath = null }: HomeDesktopPageP
           </AlertDialog>
         </section>
 
-        <footer className="flex items-center justify-center pb-4 pt-2">
-          <div className="flex items-center gap-2 rounded-2xl border border-white/20 bg-black/35 px-3 py-2 shadow-xl backdrop-blur-md">
-            {dockApps.map((app, index) => (
-              <button
-                type="button"
-                key={app.id}
-                onClick={() => {
-                  if (app.id === "music") {
-                    openWithLoading(app.onClick);
-                    return;
-                  }
-                  app.onClick();
-                }}
-                onMouseEnter={() => setHoveredDockIndex(index)}
-                onMouseLeave={() => setHoveredDockIndex(null)}
-                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-white/10 text-lg transition duration-200 hover:bg-white/20"
-                style={{
-                  transform: `translateY(${hoveredDockIndex !== null && index === hoveredDockIndex ? "-2px" : "0px"}) scale(${getDockIconScale(index)})`,
-                }}
-              >
-                {app.icon}
-              </button>
-            ))}
-          </div>
-        </footer>
+        <HomeDock
+          dockApps={dockApps}
+          hoveredDockIndex={hoveredDockIndex}
+          getDockIconScale={getDockIconScale}
+          onHoverDockIndex={setHoveredDockIndex}
+          onOpenWithLoading={openWithLoading}
+        />
       </main>
       <Toaster richColors position="top-right" />
     </div>

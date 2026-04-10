@@ -1,4 +1,5 @@
 import { spotifyPlayerResponseSchema } from "@/features/home/spotify-player-schema";
+import { requestJson } from "@/features/home/api-client";
 
 export type SpotifyPlayerAction = "previous" | "pause" | "next";
 
@@ -7,20 +8,23 @@ type LoadSpotifyPlayerResult =
   | { success: false; error: string };
 
 export const loadSpotifyPlayer = async (): Promise<LoadSpotifyPlayerResult> => {
-  try {
-    const response = await fetch("/api/spotify-player", { cache: "no-store" });
-    const json = await response.json();
-    const parsed = spotifyPlayerResponseSchema.safeParse(json);
-    if (!parsed.success) {
-      return { success: false, error: "Invalid Spotify response format." };
-    }
-    if (!response.ok) {
-      return { success: false, error: parsed.data.error ?? "Failed to load Spotify player." };
-    }
-    return { success: true, player: parsed.data.player };
-  } catch {
-    return { success: false, error: "Failed to load Spotify player." };
+  const result = await requestJson({
+    input: "/api/spotify-player",
+    init: { cache: "no-store" },
+    parse: (json) => {
+      const parsed = spotifyPlayerResponseSchema.safeParse(json);
+      if (!parsed.success) {
+        return { success: false };
+      }
+      return { success: true, data: parsed.data };
+    },
+    invalidMessage: "Invalid Spotify response format.",
+    fallbackError: "Failed to load Spotify player.",
+  });
+  if (!result.success) {
+    return result;
   }
+  return { success: true, player: result.data.player };
 };
 
 export const controlSpotifyPlayer = async (action: SpotifyPlayerAction): Promise<{ success: true } | { success: false; error: string }> => {

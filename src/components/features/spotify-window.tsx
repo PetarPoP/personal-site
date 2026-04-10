@@ -103,7 +103,11 @@ export function SpotifyWindow({
 
   const content = useMemo(() => {
     if (loading) {
-      return <p className="text-sm text-white/70">Loading Spotify...</p>;
+      return (
+        <div className="flex h-full items-center justify-center">
+          <p className="text-sm text-white/70">Loading Spotify...</p>
+        </div>
+      );
     }
     if (error) {
       return <p className="text-sm text-red-200">{genericErrorLabel}</p>;
@@ -195,8 +199,8 @@ export function SpotifyWindow({
       onFocus={onFocus}
       onClose={onClose}
     >
-      <div className="h-[calc(66vh-40px)] p-3">
-        <div className="h-full rounded-lg border border-white/15 bg-black/20 p-5">
+      <div className="flex-1 min-h-0 p-3">
+        <div className="flex h-full min-h-0 flex-col rounded-lg border border-white/15 bg-black/20 p-5">
           {content}
         </div>
       </div>

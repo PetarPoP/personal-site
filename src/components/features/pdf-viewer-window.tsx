@@ -40,7 +40,7 @@ export function PdfViewerWindow({
       onFocus={onFocus}
       onClose={onClose}
     >
-      <div className="pdf-viewer-body h-[calc(80vh-40px)] p-3">
+      <div className="pdf-viewer-body flex-1 min-h-0 p-3">
         {fileUrl ? (
           <iframe title={title} src={fileUrl} className="h-full w-full rounded border border-white/15 bg-white" />
         ) : (

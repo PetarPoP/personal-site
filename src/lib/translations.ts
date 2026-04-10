@@ -1,4 +1,4 @@
-import type { Language } from "@/lib/types";
+import type { Language } from "@/features/home/types";
 
 export type Copy = {
   places: string;

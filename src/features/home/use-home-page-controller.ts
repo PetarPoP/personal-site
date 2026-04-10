@@ -4,6 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { toast } from "sonner";
 import { mailSchema } from "@/lib/schemas";
 import { getCopy } from "@/lib/translations";
+import { useBootSequence } from "@/features/home/hooks/use-boot-sequence";
+import { useClock } from "@/features/home/hooks/use-clock";
 import {
   BOOT_LINES,
   EXPLORER_PATHS,
@@ -90,11 +92,8 @@ const getInitialLocalTextFiles = (): LocalTextFile[] => {
 };
 
 export const useHomePageController = (initialRoutePath: ExplorerPath | null = null) => {
-  const [isBooting, setIsBooting] = useState(initialRoutePath === null);
-  const [awaitingBootReveal, setAwaitingBootReveal] = useState(false);
-  const [bootTextFadeOut, setBootTextFadeOut] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [clock, setClock] = useState("");
+  const { isBooting, awaitingBootReveal, bootTextFadeOut, progress, completeBoot } = useBootSequence(initialRoutePath);
+  const clock = useClock();
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [desktopApps, setDesktopApps] = useState<DesktopApp[]>(INITIAL_DESKTOP_APPS);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -160,66 +159,6 @@ export const useHomePageController = (initialRoutePath: ExplorerPath | null = nu
       const next = prev.filter((id) => id !== windowId);
       return [...next, windowId];
     });
-  }, []);
-
-  useEffect(() => {
-    const updateClock = () => {
-      setClock(
-        new Date().toLocaleTimeString("hr-HR", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      );
-    };
-
-    updateClock();
-    const interval = setInterval(updateClock, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (!isBooting) {
-      return;
-    }
-    let animationFrame = 0;
-    const durationMs = 2600;
-    const start = performance.now();
-
-    const animate = (time: number) => {
-      const elapsed = time - start;
-      const linear = Math.min(elapsed / durationMs, 1);
-      const eased = 1 - (1 - linear) ** 3;
-      const nextProgress = eased * 100;
-      setProgress(nextProgress);
-
-      if (linear < 1) {
-        animationFrame = requestAnimationFrame(animate);
-      } else {
-        setProgress(100);
-        setBootTextFadeOut(true);
-      }
-    };
-
-    animationFrame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationFrame);
-  }, [isBooting]);
-
-  useEffect(() => {
-    if (!bootTextFadeOut || !isBooting) {
-      return;
-    }
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const delayMs = prefersReducedMotion ? 0 : 550;
-    const id = window.setTimeout(() => {
-      setAwaitingBootReveal(true);
-    }, delayMs);
-    return () => window.clearTimeout(id);
-  }, [bootTextFadeOut, isBooting]);
-
-  const completeBoot = useCallback(() => {
-    setIsBooting(false);
-    setAwaitingBootReveal(false);
-    setBootTextFadeOut(false);
   }, []);
 
   useLayoutEffect(() => {

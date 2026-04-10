@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppWindowShell } from "@/components/features/app-window-shell";
 import { Input } from "@/components/ui/input";
 
@@ -23,8 +23,27 @@ export function TerminalWindow({
   onFocus,
   onClose,
 }: TerminalWindowProps) {
-  const [lines, setLines] = useState<string[]>(["pop@desktop:~$"]);
+  const sessionId = useMemo(() => crypto.randomUUID(), []);
+  const outputRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [lines, setLines] = useState<string[]>([]);
   const [input, setInput] = useState("");
+  const [cwd, setCwd] = useState("~");
+  const [isRunning, setIsRunning] = useState(false);
+  const prompt = `pop@desktop:${cwd}$`;
+
+  useEffect(() => {
+    outputRef.current?.scrollTo({
+      top: outputRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [lines, isRunning]);
+  useEffect(() => {
+    if (!open || isRunning) {
+      return;
+    }
+    inputRef.current?.focus();
+  }, [isRunning, open]);
 
   return (
     <AppWindowShell
@@ -38,33 +57,80 @@ export function TerminalWindow({
       onFocus={onFocus}
       onClose={onClose}
     >
-      <div className="terminal-body h-[calc(70vh-40px)] p-3">
-        <div className="flex h-full flex-col rounded-lg border border-white/15 bg-[#0a0f1a] p-3">
-          <div className="flex-1 space-y-1 overflow-auto font-mono text-sm text-[#8df7b3]">
+      <div className="terminal-body flex-1 min-h-0 p-3">
+        <div className="flex h-full min-h-0 flex-col rounded-lg border border-white/15 bg-[#0a0f1a] p-3">
+          <div ref={outputRef} className="flex-1 space-y-1 overflow-auto font-mono text-sm text-[#8df7b3]">
             {lines.map((line, index) => (
               <p key={`${index}-${line}`}>{line}</p>
             ))}
+            {isRunning ? <p className="text-[#8df7b3]/70">Running...</p> : null}
           </div>
           <div className="mt-2 flex items-center gap-2 border-t border-white/10 pt-2">
-            <span className="font-mono text-sm text-[#8df7b3]">pop@desktop:~$</span>
             <Input
+              ref={inputRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => {
+              onKeyDown={async (event) => {
                 if (event.key !== "Enter") {
+                  return;
+                }
+                if (isRunning) {
                   return;
                 }
                 const next = input.trim();
                 if (!next) {
-                  setLines((prev) => [...prev, "pop@desktop:~$"]);
-                  setInput("");
                   return;
                 }
-                setLines((prev) => [...prev, `pop@desktop:~$ ${next}`, next]);
                 setInput("");
+                setIsRunning(true);
+                setLines((prev) => [...prev, `${prompt} ${next}`]);
+                try {
+                  const response = await fetch("/api/terminal", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      sessionId,
+                      command: next,
+                    }),
+                  });
+                  const data = (await response.json()) as {
+                    output?: string;
+                    cwd?: string;
+                    error?: string;
+                    exitCode?: number;
+                    clear?: boolean;
+                  };
+                  if (!response.ok) {
+                    setLines((prev) => [...prev, data.error ?? "Terminal execution failed."]);
+                    return;
+                  }
+                  if (data.cwd) {
+                    setCwd(data.cwd);
+                  }
+                  if (data.clear) {
+                    setLines([]);
+                  }
+                  if (data.output && data.output.length > 0) {
+                    setLines((prev) => [...prev, data.output]);
+                  }
+                  if ((data.exitCode ?? 0) !== 0) {
+                    setLines((prev) => [...prev, `[exit ${data.exitCode}]`]);
+                  }
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : "Unknown terminal error.";
+                  setLines((prev) => [...prev, message]);
+                } finally {
+                  setIsRunning(false);
+                  window.requestAnimationFrame(() => {
+                    inputRef.current?.focus();
+                  });
+                }
               }}
-              className="h-8 bg-white/5 font-mono text-[#8df7b3] placeholder:text-[#8df7b3]/45"
-              placeholder="Type message..."
+              className="h-8 w-full bg-white/5 font-mono text-[#8df7b3] placeholder:text-[#8df7b3]/45"
+              placeholder=""
+              disabled={isRunning}
             />
           </div>
         </div>

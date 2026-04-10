@@ -28,13 +28,13 @@ body::before {
   background-size: 100% 4px;
 }
 
-body.app-loading-cursor,
-body.app-loading-cursor * {
+.app-loading-cursor,
+.app-loading-cursor * {
   cursor: progress !important;
 }
 
-body.disable-text-selection,
-body.disable-text-selection * {
+.disable-text-selection,
+.disable-text-selection * {
   user-select: none !important;
   -webkit-user-select: none !important;
 }
@@ -83,31 +83,28 @@ body.disable-text-selection * {
   animation: window-out 180ms ease-in forwards;
 }
 
-.explorer-window:fullscreen {
-  animation: fullscreen-in 180ms ease-out;
+.window-resizable {
+  overflow: hidden;
+  min-height: 240px;
 }
 
-.fullscreen-exit {
-  animation: fullscreen-out 160ms ease-in forwards;
-}
-
-.app-window-shell:fullscreen {
-  width: 100vw !important;
-  height: 100vh !important;
+.window-maximized {
+  width: 100% !important;
+  height: 100% !important;
   max-width: none !important;
-  border-radius: 0 !important;
+  max-height: none !important;
+  transform: none !important;
 }
 
-.app-window-shell:fullscreen .text-editor-body {
-  height: calc(100vh - 40px) !important;
-}
-
-.app-window-shell:fullscreen .pdf-viewer-body {
-  height: calc(100vh - 40px) !important;
-}
-
-.app-window-shell:fullscreen .terminal-body {
-  height: calc(100vh - 40px) !important;
+@media (prefers-reduced-motion: reduce) {
+  .window-open,
+  .window-close,
+  .boot-line,
+  .boot-reveal-top-cap,
+  .boot-reveal-bottom-cap {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 @keyframes window-in {

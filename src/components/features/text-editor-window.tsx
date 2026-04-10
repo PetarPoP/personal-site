@@ -43,12 +43,6 @@ export function TextEditorWindow({
   const renameInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (!open) {
-      setIsRenaming(false);
-    }
-  }, [open]);
-
-  useEffect(() => {
     if (!isRenaming) {
       return;
     }
@@ -95,9 +89,12 @@ export function TextEditorWindow({
           {saveLabel} ({saveStatusLabel})
         </Button>
       }
-      onClose={onClose}
+      onClose={() => {
+        setIsRenaming(false);
+        onClose();
+      }}
     >
-      <div className="text-editor-body h-[calc(80vh-40px)] p-3">
+      <div className="text-editor-body flex-1 min-h-0 p-3">
         <Textarea
           value={value}
           onChange={(event) => onChange(event.target.value)}

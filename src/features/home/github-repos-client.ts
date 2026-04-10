@@ -1,4 +1,5 @@
 import { githubRepoListResponseSchema } from "@/features/home/github-repos-schema";
+import { requestJson } from "@/features/home/api-client";
 import type { GithubRepo } from "@/features/home/types";
 
 type LoadGithubReposResult =
@@ -6,18 +7,20 @@ type LoadGithubReposResult =
   | { success: false; error: string };
 
 export const loadGithubRepos = async (): Promise<LoadGithubReposResult> => {
-  try {
-    const response = await fetch("/api/github-repos");
-    const json = await response.json();
-    const parsed = githubRepoListResponseSchema.safeParse(json);
-    if (!parsed.success) {
-      return { success: false, error: "Invalid response format." };
-    }
-    if (!response.ok) {
-      return { success: false, error: parsed.data.error ?? "Failed to load repositories." };
-    }
-    return { success: true, repos: parsed.data.repos };
-  } catch {
-    return { success: false, error: "Failed to load repositories." };
+  const result = await requestJson({
+    input: "/api/github-repos",
+    parse: (json) => {
+      const parsed = githubRepoListResponseSchema.safeParse(json);
+      if (!parsed.success) {
+        return { success: false };
+      }
+      return { success: true, data: parsed.data };
+    },
+    invalidMessage: "Invalid response format.",
+    fallbackError: "Failed to load repositories.",
+  });
+  if (!result.success) {
+    return result;
   }
+  return { success: true, repos: result.data.repos };
 };
