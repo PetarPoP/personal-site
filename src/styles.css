@@ -1,0 +1,87 @@
+@import 'tailwindcss';
+
+/* Palette from the design brief: teal-black ground, teal structure,
+   amber primary, orange signal. */
+@theme {
+  --color-ink: #0d1b1c;
+  --color-deep: #1c3132;
+  --color-teal: #476762;
+  --color-mist: #8fb3ad;
+  --color-amber: #efab30;
+  --color-signal: #df5e00;
+  --color-paper: #f1ede4;
+  --color-dim: color-mix(in srgb, #476762 15%, #f1ede4);
+  --color-caption: color-mix(in srgb, #476762 30%, #f1ede4);
+  --color-label: color-mix(in srgb, #476762 45%, #f1ede4);
+
+  --font-sans: 'Figtree', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+}
+
+@layer base {
+  html {
+    background: var(--color-ink);
+    color-scheme: dark;
+  }
+  body {
+    margin: 0;
+    background: var(--color-ink);
+    color: var(--color-paper);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.55;
+    overflow-x: hidden;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-amber) 35%, transparent);
+  }
+  :focus {
+    outline: none;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-amber);
+    outline-offset: 2px;
+  }
+  /* The HUD and the scroll engine replace the page scrollbar. */
+  html::-webkit-scrollbar {
+    width: 0;
+  }
+  html {
+    scrollbar-width: none;
+  }
+}
+
+@utility stripes {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--stripe, var(--color-deep)) 0 1px,
+    var(--color-ink) 1px 10px
+  );
+}
+
+@utility scanlines {
+  background: repeating-linear-gradient(
+    0deg,
+    oklch(1 0 0 / 0.03) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+@utility grid-rules {
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--color-deep) 0 1px,
+    transparent 1px 94.5px
+  );
+}
+
+@utility outline-text {
+  color: transparent;
+  -webkit-text-stroke: 2px var(--color-signal);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-fx='scramble'] {
+    opacity: 1 !important;
+  }
+}
