@@ -6,21 +6,24 @@ export const profile = {
   tagline: '// developer + photographer — livno, bih',
   email: 'petarpopovic0712@gmail.com',
   github: 'https://github.com/PetarPoP',
-  cv: '/cv.pdf',
+  cvs: [
+    { lang: 'EN', label: 'English', href: '/cv.pdf', file: 'PetarPopovic_CV_EN.pdf' },
+    { lang: 'HR', label: 'Hrvatski', href: '/cv-hr.pdf', file: 'PetarPopovic_CV_HRV.pdf' },
+  ],
   // Drop a photo in /public and set its path here to replace the placeholder.
   portrait: undefined as string | undefined,
   facts: [
     { label: 'Based in', value: 'Livno, BiH / Split, HR' },
-    { label: 'Studying', value: 'Computer science, year 4' },
-    { label: 'Stack', value: 'Next.js · React · C++' },
+    { label: 'Studying', value: 'Applied computing, year 5' },
+    { label: 'Stack', value: 'Next.js · React · C/C++' },
   ],
   about: [
-    'Motivated fourth-year CS student.',
-    'I ship web apps in Next.js and React,',
+    'Fifth-year computer science student.',
+    'I build web apps and real-time embedded software,',
     'and shoot people and places.',
   ],
   marquee:
-    'Next.js / React / Tailwind / C++ / Python / Photography / UI Design /',
+    'Next.js / React / TanStack / C / C++ / STM32 / CAN / Python / Photography /',
 }
 
 export type Project = {
@@ -35,35 +38,35 @@ export type Project = {
 
 export const projects: Project[] = [
   {
-    title: ['WEB SHOP', 'APPLICATION'],
-    stack: 'Next.js, Tailwind',
-    type: 'E‑commerce',
+    title: ['FESB RACING', 'WEBSITE'],
+    stack: 'TanStack Start, React, TS',
+    type: 'Team website',
     href: 'https://github.com/PetarPoP',
-    caption: 'SCREEN_01 · web shop',
+    caption: 'SCREEN_01 · fesb racing',
     stripe: 'var(--color-deep)',
   },
   {
-    title: ['STUDENTSKI', 'POSLOVI'],
-    stack: 'React',
-    type: 'Job board',
+    title: ['STEERING WHEEL', 'CAN NODE'],
+    stack: 'C, STM32F4, CAN',
+    type: 'Embedded firmware',
     href: 'https://github.com/PetarPoP',
-    caption: 'SCREEN_02 · studentski poslovi',
+    caption: 'CAPTURE_02 · steering wheel',
     stripe: 'color-mix(in srgb, #df5e00 28%, #0d1b1c)',
   },
   {
-    title: ['CATERING', 'SITE'],
-    stack: 'Next.js',
-    type: 'Business site',
+    title: ['IDEA', 'PLANNER'],
+    stack: 'Next.js, Tauri, Rust',
+    type: 'Desktop app',
     href: 'https://github.com/PetarPoP',
-    caption: 'SCREEN_03 · catering',
+    caption: 'SCREEN_03 · ideaplanner',
     stripe: 'var(--color-deep)',
   },
   {
-    title: ['SPACE', 'INVADERS'],
-    stack: 'C++',
-    type: 'Desktop game',
+    title: ['OBD BLE', 'MONITOR'],
+    stack: 'C, ESP32, React Native',
+    type: 'Car diagnostics',
     href: 'https://github.com/PetarPoP',
-    caption: 'CAPTURE_04 · gameplay',
+    caption: 'CAPTURE_04 · obd monitor',
     stripe: 'var(--color-teal)',
   },
 ]
@@ -95,24 +98,40 @@ export type Role = {
 
 export const experience: Role[] = [
   {
-    when: '2024.10 — 2025.10',
-    title: 'Programmer',
-    where: 'Kibernetika, Split — Next.js & React apps for students',
+    when: '2025.09 — now',
+    title: 'Embedded developer',
+    where: 'FESB Racing — VCU software for an electric formula student car, CAN bus on STM32',
+  },
+  {
+    when: '2023.09 — 2025.09',
+    title: 'Software developer',
+    where: 'Kibernetika, Split — Next.js & React apps for SCST, SSR and performance',
   },
   {
     when: '2024.09 — 2025.02',
     title: 'Demonstrator',
-    where: 'Univ. Dept. for Professional Studies — data structures & algorithms',
+    where: 'Univ. Dept. of Professional Studies — data structures & algorithms',
   },
   {
-    when: '2023.10 — 2025.01',
+    when: '2023.01 — 2024.01',
     title: 'Photographer',
     where: 'Foto Marin, Livno — portraits & events',
   },
   {
+    when: '2021.05 — 2025',
+    title: 'Sales associate',
+    where: 'Popović Jewelry — sales & client relationships',
+  },
+  {
     when: '2022 — now',
-    title: 'BSc Computer science',
-    where: 'Split — React course, top marks',
+    title: 'Applied computing',
+    where: 'Univ. Dept. of Professional Studies, Split',
+    education: true,
+  },
+  {
+    when: '2024.03 — 2024.05',
+    title: 'React course',
+    where: 'Digitalna Dalmacija, Junior DEV — highest marks',
     education: true,
   },
   {
