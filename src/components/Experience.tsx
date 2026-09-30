@@ -1,4 +1,5 @@
-import { experience, profile } from '#/data/portfolio'
+import { experience } from '#/data/portfolio'
+import { CvDownload } from './CvDownload'
 import { Label } from './Label'
 
 export function Experience() {
@@ -14,13 +15,7 @@ export function Experience() {
             EXPERIENCE.LOG
           </h2>
         </div>
-        <a
-          href={profile.cv}
-          download="Petar-Popovic-CV.pdf"
-          className="bg-amber px-[18px] py-3 font-mono text-[13px] font-bold text-ink uppercase no-underline transition-colors hover:bg-[color-mix(in_srgb,var(--color-amber)_80%,#fff)]"
-        >
-          Download CV.pdf ↓
-        </a>
+        <CvDownload />
       </div>
       <ol className="m-0 flex list-none flex-col border-t border-teal p-0">
         {experience.map((r) => (
