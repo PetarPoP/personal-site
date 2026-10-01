@@ -3,10 +3,12 @@ import { bootLog, photoCategories, profile, projects, toneColor } from '#/data/p
 import type { PhotoCategory } from '#/data/portfolio'
 import { appFromSlug, apps, formatClock, stripes } from '#/lib/os'
 import type { AppId } from '#/lib/os'
-import { blinkOn, markBooted, shouldSkipBoot, useNow, useTerminal } from '#/lib/hooks'
+import { blinkOn, dropBackLayers, markBooted, popBackLayer, useBackLayer, shouldSkipBoot, useNow, useTerminal } from '#/lib/hooks'
 import { useCvPicker } from './CvPicker'
 import { CvDocument, CvLangSwitch, HudCorners, LogoBox, MailSent, ProgressBar, Shot, Wordmark, useMailto } from './shared'
 import type { CvLang } from './shared'
+import { PhotoSwipe } from './PhotoSwipe'
+import type { SwipeHandle } from './PhotoSwipe'
 import { SpotifyPlayer } from './Spotify'
 import { toast } from './Toaster'
 import { TerminalBody } from './Terminal'
@@ -62,6 +64,7 @@ export function Mobile({
   useEffect(() => {
     if (!enabled) return
     const onPop = () => {
+      if (popBackLayer()) return
       if (stacked.current) {
         stacked.current = false
         setAppOpen(false)
@@ -130,10 +133,12 @@ export function Mobile({
   useEffect(() => () => clearInterval(timer.current), [])
 
   const back = useCallback(() => {
+    // An open photo viewer holds history entries above the app's own.
+    const extra = dropBackLayers()
     if (stacked.current) {
       stacked.current = false
       leaving.current = true
-      window.history.back()
+      window.history.go(-1 - extra)
     }
     setAppOpen(false)
   }, [])
@@ -407,9 +412,11 @@ function PhotosApp() {
   const [viewer, setViewer] = useState<string | null>(null)
   const list = gallery.frames.filter((p) => gallery.live || filter === 'All' || p.category === filter)
   const at = list.findIndex((p) => p.key === viewer)
-  const step = (dir: number) => setViewer(list[(at + dir + list.length) % list.length].key)
   const cur = at >= 0 ? list[at] : null
   usePreload(cur ? [list[(at + 1) % list.length]?.full, list[(at - 1 + list.length) % list.length]?.full] : [])
+  const swipe = useRef<SwipeHandle>(null)
+  // The phone's back button closes the photo before the app.
+  useBackLayer(Boolean(cur), () => setViewer(null))
   return (
     <div className="flex flex-col gap-3 p-3.5">
       {!gallery.live && (
@@ -463,16 +470,24 @@ function PhotosApp() {
       </div>
       {cur && (
         <div role="dialog" aria-label={cur.caption} className="fixed inset-0 z-[5] flex flex-col bg-ink pt-12 pb-[30px]">
-          <Shot
-            key={cur.key}
-            src={cur.full}
-            preview={cur.src !== cur.full ? cur.src : undefined}
-            tone={cur.tone}
-            alt={cur.caption}
+          <PhotoSwipe
+            ref={swipe}
+            list={list}
+            at={at}
+            onChange={(i) => setViewer(list[i].key)}
             className="flex-1"
-            label={cur.full ? undefined : `full‑res · ${cur.caption}`}
-            labelClassName="text-[10px] text-muted m-auto"
-            contain
+            render={(p) => (
+              <Shot
+                src={p.full}
+                preview={p.src !== p.full ? p.src : undefined}
+                tone={p.tone}
+                alt={p.caption}
+                className="flex-1"
+                label={p.full ? undefined : `full‑res · ${p.caption}`}
+                labelClassName="text-[10px] text-muted m-auto"
+                contain
+              />
+            )}
           />
           <div className="flex items-center gap-2 px-4 py-3.5 text-xs">
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -482,10 +497,10 @@ function PhotosApp() {
                 {cur.meta && ` · ${cur.meta}`}
               </span>
             </div>
-            <button type="button" aria-label="Previous" onClick={() => step(-1)} className="size-11 cursor-pointer border border-teal bg-transparent text-paper">
+            <button type="button" aria-label="Previous" onClick={() => swipe.current?.step(-1)} className="size-11 cursor-pointer border border-teal bg-transparent text-paper">
               ‹
             </button>
-            <button type="button" aria-label="Next" onClick={() => step(1)} className="size-11 cursor-pointer border border-teal bg-transparent text-paper">
+            <button type="button" aria-label="Next" onClick={() => swipe.current?.step(1)} className="size-11 cursor-pointer border border-teal bg-transparent text-paper">
               ›
             </button>
             <button type="button" aria-label="Close" autoFocus onClick={() => setViewer(null)} className="size-11 cursor-pointer border border-signal bg-signal text-ink">
