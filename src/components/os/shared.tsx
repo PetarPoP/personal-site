@@ -13,6 +13,7 @@ export function Shot({
   style,
   labelClassName = 'text-[10px] text-muted',
   keepLabel = false,
+  contain = false,
 }: {
   src?: string
   tone: string
@@ -23,11 +24,13 @@ export function Shot({
   labelClassName?: string
   // Placeholder labels disappear once a real image is set, unless kept (photo captions).
   keepLabel?: boolean
+  // Show the whole image (photo viewers) instead of filling the box.
+  contain?: boolean
 }) {
   return (
     <span className={`relative flex items-end overflow-hidden ${className}`} style={{ background: stripes(tone), ...style }}>
       {src ? (
-        <img src={src} alt={alt} className="absolute inset-0 size-full object-cover" />
+        <img src={src} alt={alt} loading="lazy" decoding="async" className={`absolute inset-0 size-full ${contain ? 'bg-ink object-contain' : 'object-cover'}`} />
       ) : (
         <span role="img" aria-label={`Placeholder: ${alt}`} className="absolute inset-0" />
       )}

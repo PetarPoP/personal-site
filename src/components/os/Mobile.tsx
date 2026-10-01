@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { bootLog, photoCategories, photoCode, photos, profile, projects, toneColor } from '#/data/portfolio'
+import { bootLog, photoCategories, profile, projects, toneColor } from '#/data/portfolio'
 import type { PhotoCategory } from '#/data/portfolio'
 import { apps, formatClock, stripes } from '#/lib/os'
 import type { AppId } from '#/lib/os'
@@ -12,6 +12,7 @@ import { toast } from './Toaster'
 import { TerminalBody } from './Terminal'
 import { ConfirmDelete, NoteEditor, NoteView, noteLimitHint } from './Notes'
 import { useNotes } from '#/lib/useNotes'
+import { usePhotos } from '#/lib/usePhotos'
 import type { Note } from '#/lib/notes'
 
 const homeApps: (AppId | 'github')[] = ['work', 'photos', 'notes', 'cv', 'mail', 'spotify', 'term', 'about', 'github']
@@ -105,7 +106,7 @@ export function Mobile({
 
   const subtitle: Record<AppId, string> = {
     work: `${projects.length} repos`,
-    photos: `${photos.length} frames`,
+    photos: 'gallery',
     notes: 'guest notes',
     cv: 'pdf · en / hr',
     mail: 'new message',
@@ -361,47 +362,56 @@ function ProjectsApp() {
 }
 
 function PhotosApp() {
+  const gallery = usePhotos()
   const [filter, setFilter] = useState<'All' | PhotoCategory>('All')
-  const [viewer, setViewer] = useState(-1)
-  const list = photos.map((p, i) => ({ ...p, i })).filter((p) => filter === 'All' || p.category === filter)
-  const step = (dir: number) => {
-    const j = list.findIndex((p) => p.i === viewer)
-    setViewer(list[(j + dir + list.length) % list.length].i)
-  }
-  const cur = viewer >= 0 ? photos[viewer] : null
+  const [viewer, setViewer] = useState<string | null>(null)
+  const list = gallery.frames.filter((p) => gallery.live || filter === 'All' || p.category === filter)
+  const at = list.findIndex((p) => p.key === viewer)
+  const step = (dir: number) => setViewer(list[(at + dir + list.length) % list.length].key)
+  const cur = at >= 0 ? list[at] : null
   return (
     <div className="flex flex-col gap-3 p-3.5">
-      <div role="tablist" aria-label="Filter photos" className="thin-scroll flex gap-1.5 overflow-x-auto pb-0.5">
-        {photoCategories.map((c) => (
-          <button
-            key={c}
-            role="tab"
-            type="button"
-            aria-selected={c === filter}
-            onClick={() => {
-              setFilter(c)
-              setViewer(-1)
-            }}
-            className={`h-[34px] flex-none cursor-pointer border px-3 font-mono text-[11px] font-medium ${c === filter ? 'border-amber bg-amber text-ink' : 'border-teal bg-transparent text-paper'}`}
-          >
-            {c}
-          </button>
-        ))}
-      </div>
+      {!gallery.live && (
+        <div role="tablist" aria-label="Filter photos" className="thin-scroll flex gap-1.5 overflow-x-auto pb-0.5">
+          {photoCategories.map((c) => (
+            <button
+              key={c}
+              role="tab"
+              type="button"
+              aria-selected={c === filter}
+              onClick={() => {
+                setFilter(c)
+                setViewer(null)
+              }}
+              className={`h-[34px] flex-none cursor-pointer border px-3 font-mono text-[11px] font-medium ${c === filter ? 'border-amber bg-amber text-ink' : 'border-teal bg-transparent text-paper'}`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
+      {gallery.loading && <p className="m-0 text-xs text-dim">developing film…</p>}
+      {gallery.error && (
+        <div className="flex flex-col gap-2 text-xs">
+          <p className="m-0 text-signal">Couldn't load the photos right now.</p>
+          <p className="m-0 text-dim select-text">{gallery.error}</p>
+        </div>
+      )}
+      {gallery.live && !gallery.loading && !gallery.error && !list.length && <p className="m-0 text-xs text-dim">The album is empty.</p>}
       <div className="columns-2 gap-2">
         {list.map((p) => (
           <button
-            key={p.i}
+            key={p.key}
             type="button"
             aria-label={`Open ${p.caption}`}
-            onClick={() => setViewer(p.i)}
+            onClick={() => setViewer(p.key)}
             className="mb-2 block w-full cursor-pointer break-inside-avoid border border-deep p-0"
           >
             <Shot
               src={p.src}
-              tone={toneColor[p.tone]}
+              tone={p.tone}
               alt={p.caption}
-              label={photoCode(p.i)}
+              label={p.code}
               className="w-full p-1.5"
               style={{ height: p.mobileHeight }}
               labelClassName="bg-ink px-[5px] py-0.5 text-[9px] text-paper"
@@ -413,18 +423,21 @@ function PhotosApp() {
       {cur && (
         <div role="dialog" aria-label={cur.caption} className="fixed inset-0 z-[5] flex flex-col bg-ink pt-12 pb-[30px]">
           <Shot
-            src={cur.src}
-            tone={toneColor[cur.tone]}
+            key={cur.key}
+            src={cur.full}
+            tone={cur.tone}
             alt={cur.caption}
             className="flex-1"
-            label={cur.src ? undefined : `full‑res · ${cur.caption}`}
+            label={cur.full ? undefined : `full‑res · ${cur.caption}`}
             labelClassName="text-[10px] text-muted m-auto"
+            contain
           />
           <div className="flex items-center gap-2 px-4 py-3.5 text-xs">
-            <div className="flex flex-1 flex-col gap-0.5">
-              <span className="font-sans text-base font-bold">{cur.caption}</span>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="truncate font-sans text-base font-bold">{cur.caption}</span>
               <span className="text-dim">
-                {photoCode(viewer)} · {cur.category}
+                {cur.code}
+                {cur.meta && ` · ${cur.meta}`}
               </span>
             </div>
             <button type="button" aria-label="Previous" onClick={() => step(-1)} className="size-11 cursor-pointer border border-teal bg-transparent text-paper">
@@ -433,7 +446,7 @@ function PhotosApp() {
             <button type="button" aria-label="Next" onClick={() => step(1)} className="size-11 cursor-pointer border border-teal bg-transparent text-paper">
               ›
             </button>
-            <button type="button" aria-label="Close" autoFocus onClick={() => setViewer(-1)} className="size-11 cursor-pointer border border-signal bg-signal text-ink">
+            <button type="button" aria-label="Close" autoFocus onClick={() => setViewer(null)} className="size-11 cursor-pointer border border-signal bg-signal text-ink">
               ×
             </button>
           </div>

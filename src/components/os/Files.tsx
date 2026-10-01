@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { photoCategories, photoCode, photos, profile, projects, toneColor } from '#/data/portfolio'
+import { photoCategories, profile, projects, toneColor } from '#/data/portfolio'
 import type { PhotoCategory } from '#/data/portfolio'
 import type { Folder, WindowId } from '#/lib/os'
 import { useNotes } from '#/lib/useNotes'
+import { usePhotos } from '#/lib/usePhotos'
+import type { Frame } from '#/lib/usePhotos'
 import { useCvPicker } from './CvPicker'
 import { NotesFolder } from './Notes'
 import type { OpenMenu } from './Notes'
@@ -23,17 +25,14 @@ export function FilesWindow({
 }) {
   const [photoFilter, setPhotoFilter] = useState<'All' | PhotoCategory>('All')
   const notes = useNotes(false)
-  const count =
-    folder === 'projects'
-      ? projects.length
-      : folder === 'photos'
-        ? photos.filter((p) => photoFilter === 'All' || p.category === photoFilter).length
-        : notes.notes.length
+  const gallery = usePhotos(folder === 'photos')
+  const shown = gallery.frames.filter((p) => gallery.live || photoFilter === 'All' || p.category === photoFilter)
+  const count = folder === 'projects' ? projects.length : folder === 'photos' ? shown.length : notes.notes.length
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[180px_minmax(0,1fr)]">
       <Places folder={folder} setFolder={setFolder} count={count} openWin={openWin} />
       {folder === 'projects' && <ProjectsFolder />}
-      {folder === 'photos' && <PhotosFolder filter={photoFilter} setFilter={setPhotoFilter} />}
+      {folder === 'photos' && <PhotosFolder gallery={gallery} list={shown} filter={photoFilter} setFilter={setPhotoFilter} />}
       {folder === 'notes' && <NotesFolder openMenu={openMenu} />}
     </div>
   )
@@ -135,45 +134,64 @@ function ProjectsFolder() {
   )
 }
 
-function PhotosFolder({ filter, setFilter }: { filter: 'All' | PhotoCategory; setFilter: (f: 'All' | PhotoCategory) => void }) {
-  const [viewer, setViewer] = useState(-1)
-  const list = photos.map((p, i) => ({ ...p, i })).filter((p) => filter === 'All' || p.category === filter)
-  const step = (dir: number) => {
-    const j = list.findIndex((p) => p.i === viewer)
-    setViewer(list[(j + dir + list.length) % list.length].i)
-  }
-  const cur = viewer >= 0 ? photos[viewer] : null
+function PhotosFolder({
+  gallery,
+  list,
+  filter,
+  setFilter,
+}: {
+  gallery: ReturnType<typeof usePhotos>
+  list: Frame[]
+  filter: 'All' | PhotoCategory
+  setFilter: (f: 'All' | PhotoCategory) => void
+}) {
+  const [viewer, setViewer] = useState<string | null>(null)
+  const at = list.findIndex((p) => p.key === viewer)
+  const step = (dir: number) => setViewer(list[(at + dir + list.length) % list.length].key)
+  const cur = at >= 0 ? list[at] : null
+  // Real photos have no categories, so every one gets a size from its shape.
+  const all = gallery.live || filter === 'All'
   return (
     <div className="relative flex min-h-0 flex-col">
-      <div role="tablist" aria-label="Filter photos" className="flex items-center gap-1.5 border-b border-deep px-3 py-2.5">
-        {photoCategories.map((c) => (
-          <button
-            key={c}
-            role="tab"
-            type="button"
-            aria-selected={c === filter}
-            onClick={() => {
-              setFilter(c)
-              setViewer(-1)
-            }}
-            className={`cursor-pointer border px-2.5 py-1.5 font-mono text-[11px] font-medium ${c === filter ? 'border-amber bg-amber text-ink' : 'border-teal bg-transparent text-paper'}`}
-          >
-            {c}
-          </button>
-        ))}
+      <div role={gallery.live ? undefined : 'tablist'} aria-label="Filter photos" className="flex min-h-[47px] items-center gap-1.5 border-b border-deep px-3 py-2.5">
+        {!gallery.live &&
+          photoCategories.map((c) => (
+            <button
+              key={c}
+              role="tab"
+              type="button"
+              aria-selected={c === filter}
+              onClick={() => {
+                setFilter(c)
+                setViewer(null)
+              }}
+              className={`cursor-pointer border px-2.5 py-1.5 font-mono text-[11px] font-medium ${c === filter ? 'border-amber bg-amber text-ink' : 'border-teal bg-transparent text-paper'}`}
+            >
+              {c}
+            </button>
+          ))}
+        {gallery.live && !gallery.loading && !gallery.error && <span className="text-[11px] text-muted">{list.length} frames</span>}
         <span className="ml-auto text-[11px] text-dim">~/photos</span>
       </div>
-      <ul className="thin-scroll m-0 grid flex-1 list-none grid-cols-6 content-start gap-2 overflow-auto p-3">
+      {gallery.loading && <p className="m-0 p-4 text-xs text-dim">developing film…</p>}
+      {gallery.error && (
+        <div className="flex flex-col gap-2 p-4 text-xs">
+          <p className="m-0 text-signal">Couldn't load the photos right now.</p>
+          <p className="m-0 text-dim select-text">{gallery.error}</p>
+        </div>
+      )}
+      {gallery.live && !gallery.loading && !gallery.error && !list.length && <p className="m-0 p-4 text-xs text-dim">The album is empty.</p>}
+      <ul className="thin-scroll m-0 grid flex-1 grid-flow-dense list-none grid-cols-6 content-start gap-2 overflow-auto p-3">
         {list.map((p) => (
-          <li key={p.i} style={{ gridColumn: `span ${filter === 'All' ? p.span : 3}` }}>
-            <button type="button" onClick={() => setViewer(p.i)} className="block w-full cursor-zoom-in border border-deep p-0 hover:border-amber" aria-label={`Open ${p.caption}`}>
+          <li key={p.key} style={{ gridColumn: `span ${all ? p.span : 3}` }}>
+            <button type="button" onClick={() => setViewer(p.key)} className="block w-full cursor-zoom-in border border-deep p-0 hover:border-amber" aria-label={`Open ${p.caption}`}>
               <Shot
                 src={p.src}
-                tone={toneColor[p.tone]}
+                tone={p.tone}
                 alt={p.caption}
-                label={`${photoCode(p.i)} · ${p.caption}`}
+                label={`${p.code} · ${p.caption}`}
                 className="w-full p-2"
-                style={{ height: filter === 'All' ? p.height : 210 }}
+                style={{ height: all ? p.height : 210 }}
                 labelClassName="bg-ink px-1.5 py-0.5 text-[10px] font-medium text-paper"
                 keepLabel
               />
@@ -186,24 +204,26 @@ function PhotosFolder({ filter, setFilter }: { filter: 'All' | PhotoCategory; se
           role="dialog"
           aria-label={cur.caption}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') setViewer(-1)
+            if (e.key === 'Escape') setViewer(null)
             if (e.key === 'ArrowLeft') step(-1)
             if (e.key === 'ArrowRight') step(1)
           }}
           className="absolute inset-0 z-[3] flex flex-col gap-2.5 bg-ink/97 p-3.5"
         >
           <Shot
-            src={cur.src}
-            tone={toneColor[cur.tone]}
+            key={cur.key}
+            src={cur.full}
+            tone={cur.tone}
             alt={cur.caption}
             className="flex-1 items-center justify-center border border-teal"
-            label={cur.src ? undefined : `full‑res photo · ${cur.caption}`}
+            label={cur.full ? undefined : `full‑res photo · ${cur.caption}`}
             labelClassName="text-[11px] text-muted m-auto"
+            contain
           />
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-amber">{photoCode(viewer)}</span>
+            <span className="text-amber">{cur.code}</span>
             <span>{cur.caption}</span>
-            <span className="text-dim">· {cur.category}</span>
+            {cur.meta && <span className="text-dim">· {cur.meta}</span>}
             <button type="button" aria-label="Previous" onClick={() => step(-1)} className="ml-auto h-[30px] w-[34px] cursor-pointer border border-teal bg-transparent text-paper hover:border-amber">
               ‹
             </button>
@@ -213,7 +233,7 @@ function PhotosFolder({ filter, setFilter }: { filter: 'All' | PhotoCategory; se
             <button
               type="button"
               autoFocus
-              onClick={() => setViewer(-1)}
+              onClick={() => setViewer(null)}
               className="h-[30px] cursor-pointer border border-teal bg-transparent px-3 font-mono text-[11px] font-medium text-paper hover:border-signal hover:bg-signal hover:text-ink"
             >
               close

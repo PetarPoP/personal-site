@@ -24,6 +24,7 @@ npm run build    # production build (SSR)
   `pdftoppm -r 200 -png -singlefile public/petar-popovic-cv-en.pdf public/petar-popovic-cv-en` (and the same for `hr`).
 - `src/lib/os.ts` — app list and clock formatting.
 - `src/lib/terminal.ts` — the terminal: a small fake filesystem and the command parser shared by desktop and mobile.
+- `src/lib/photos.ts` — reads the Immich album for ~/photos; `src/routes/api/photos.$id.ts` streams each photo.
 - `src/lib/spotify.ts` — server function for the Spotify app (current or last played song); `src/components/os/Spotify.tsx` shows it.
 - `src/lib/notes.ts` — server functions for guest notes (`~/notes`); `src/lib/useNotes.tsx` is the client side.
 - `src/components/os/` — `Desktop.tsx` (windows, draggable icons, right-click menu), `Files.tsx` (one explorer for
@@ -63,3 +64,17 @@ Spotify says it was revoked (the Spotify app shows the reason).
 
 Spotify is asked at most every 15 seconds per server instance. Locally, `SPOTIFY_MOCK=1 npm run dev` shows a fixed song
 (`SPOTIFY_MOCK=recent` shows it as last played; `SPOTIFY_MOCK_IMAGE=<url>` adds a cover).
+
+## Photos (Immich)
+
+~/photos shows one album from Petar's own Immich server, read through the album's public share link. Add in Vercel:
+
+- `IMMICH_SHARE_URL` — the album's share link, e.g. `https://photos.example.com/share/<key>` (a `/s/<slug>` link works too)
+
+The server reads the album (at most every 5 minutes) and every image goes through `/api/photos/<id>`, so visitors never
+see the server's address or the share key, and the photos are never copied anywhere. Browsers cache each photo for an
+hour and Vercel's edge for a day. Captions come from the photo's description in Immich, else its city, else its date.
+Without `IMMICH_SHARE_URL` the striped placeholders from `portfolio.ts` are shown.
+
+Note: in `npm run dev`, Vite answers image requests to `/api/photos/…` itself, so the photos only load in a build
+(`npm run build && node .output/server/index.mjs`).
