@@ -1,4 +1,4 @@
-import { certificates, education, experience, languages, photoCode, photos, profile, projects, skills } from '#/data/portfolio'
+import { certificates, education, experience, languages, profile, projects, skills } from '#/data/portfolio'
 import type { AppId } from './os'
 
 // The POP/OS shell: a tiny fake filesystem and a command parser, shared by the
@@ -52,7 +52,7 @@ const fs: Dir = {
     photos: {
       type: 'dir',
       children: Object.fromEntries(
-        photos.map((p, i) => [`${photoCode(i)}.jpg`, file(() => [`${photoCode(i)} · ${p.caption} · ${p.category}`, '(binary image — opening Photos)'], { open: 'photos' })]),
+        [['gallery.lnk', file(() => ['(photo album — opening Photos)'], { open: 'photos' })]],
       ),
     },
     docs: {
@@ -116,7 +116,7 @@ export const commandHelp: { title: string; rows: [cmd: string, desc: string, run
     rows: [
       ['projects', 'list all projects'],
       ['project <name>', 'details of one project', 'project fesb'],
-      ['photos', 'list the photos'],
+      ['photos', 'open the photo album'],
       ['cv [en|hr]', 'open or download the CV', 'cv'],
       ['github', 'open GitHub'],
     ],
@@ -274,12 +274,8 @@ export function runCommand(raw: string, ctx: ShellContext): TermResult {
     say(`opening ${profile.githubLabel}…`, C.muted)
     effect = { url: profile.github }
   } else if (name === 'photos') {
-    lines.push({
-      kind: 'table',
-      title: `${photos.length} frames`,
-      rows: photos.map((p, i) => ({ left: photoCode(i), right: `${p.caption} · ${p.category}` })),
-    })
-    say('  → open gallery', C.amber, 'open photos')
+    say('opening Photos…', C.muted)
+    effect = { open: 'photos' }
   } else if (name === 'ls' || name === 'll' || name === 'dir') {
     ls(rest.find((r) => !r.startsWith('-')))
   } else if (name === 'cd') {

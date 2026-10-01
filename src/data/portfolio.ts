@@ -212,7 +212,7 @@ export const bootLog: ([kind: 'o', text: string] | [kind: 'l', stamp: string, te
   ['o', 'Reached target Computer Science, year 5'],
   ['o', 'Started junior-dev-certificate.service'],
   ['o', 'Started lensd — camera daemon'],
-  ['o', `Mounted /home/petar/photos (${photos.length} frames)`],
+  ['o', 'Mounted /home/petar/photos (immich)'],
   ['o', 'Mounted /docs/cv.pdf (en, hr)'],
   ['o', 'Set locale: hr_BA.UTF-8, en (B2)'],
   ['o', 'Started network: Livno ⇄ Split'],
