@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { bootLog, photoCategories, photoCode, photos, profile, projects, toneColor } from '#/data/portfolio'
 import type { PhotoCategory } from '#/data/portfolio'
-import { apps, formatClock, stripes } from '#/lib/os'
+import { appFromSlug, apps, formatClock, stripes } from '#/lib/os'
 import type { AppId } from '#/lib/os'
 import { blinkOn, markBooted, shouldSkipBoot, useNow, useTerminal } from '#/lib/hooks'
 import { useCvPicker } from './CvPicker'
@@ -28,7 +28,7 @@ export function Mobile({
 }: {
   enabled: boolean | null
   initialApp?: AppId
-  onActiveChange: (app: AppId | null) => void
+  onActiveChange: (app: AppId | null, push?: boolean) => void
 }) {
   const now = useNow()
   const clock = now === null ? null : formatClock(now)
@@ -43,9 +43,40 @@ export function Mobile({
   const [cvLang, setCvLang] = useState<CvLang>('EN')
   const timer = useRef<ReturnType<typeof setInterval>>(undefined)
 
+  // Opening an app from the home screen adds a history entry, so the phone's back button
+  // closes the app instead of leaving the site.
+  const stacked = useRef(false)
+  const leaving = useRef(false)
   useEffect(() => {
-    if (enabled) onActiveChange(appOpen ? app : null)
+    if (!enabled) return
+    if (leaving.current) {
+      // history.back() already takes the URL back to the home screen.
+      leaving.current = false
+      return
+    }
+    const push = appOpen && !stacked.current
+    if (push) stacked.current = true
+    onActiveChange(appOpen ? app : null, push)
   }, [app, appOpen, enabled, onActiveChange])
+  useEffect(() => {
+    if (!enabled) return
+    const onPop = () => {
+      if (stacked.current) {
+        stacked.current = false
+        setAppOpen(false)
+        return
+      }
+      // Forward again after going back: reopen the app in the URL.
+      const id = appFromSlug(new URLSearchParams(window.location.search).get('app') ?? undefined)
+      if (id) {
+        stacked.current = true
+        setApp(id)
+        setAppOpen(true)
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [enabled])
 
   const resetSession = useRef<() => void>(() => {})
   const boot = useCallback(() => {
@@ -88,14 +119,23 @@ export function Mobile({
     started.current = true
     if (initialApp) {
       setPhase('home')
+      // Put the home screen under a deep-linked app, so back lands there too.
+      onActiveChange(null)
       openApp(initialApp)
     } else if (!enabled) setPhase('home')
     else if (shouldSkipBoot()) setPhase('lock')
     else boot()
-  }, [enabled, initialApp, openApp, boot])
+  }, [enabled, initialApp, openApp, boot, onActiveChange])
   useEffect(() => () => clearInterval(timer.current), [])
 
-  const back = useCallback(() => setAppOpen(false), [])
+  const back = useCallback(() => {
+    if (stacked.current) {
+      stacked.current = false
+      leaving.current = true
+      window.history.back()
+    }
+    setAppOpen(false)
+  }, [])
   const term = useTerminal({ onOpen: openApp, onReboot: boot, onExit: back })
   resetSession.current = term.reset
 
