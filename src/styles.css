@@ -103,6 +103,19 @@
   animation: bob 1.9s ease-in-out infinite;
 }
 
+/* Block cursor of the terminal input. */
+@keyframes cursor-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@utility term-cursor {
+  background: var(--color-amber);
+  color: var(--color-ink);
+  animation: cursor-blink 1s steps(1) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

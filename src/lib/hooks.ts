@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { initialTerm, runCommand } from './os'
-import type { AppId, TermLine } from './os'
+import type { KeyboardEvent } from 'react'
+import { profile } from '#/data/portfolio'
+import { complete, initialTerm, runCommand } from './terminal'
+import type { TermLine } from './terminal'
+import type { AppId } from './os'
+import { setAdminKey } from './useNotes'
 
 // Current time, ticking every 500ms. Null during SSR and the first render so
 // server and client markup match.
@@ -48,33 +52,101 @@ export function markBooted() {
   }
 }
 
-// Terminal state shared by both shells: lines, the input, and the command runner.
-export function useTerminal({ onOpen, onReboot }: { onOpen: (app: AppId) => void; onReboot: () => void }) {
+// Terminal state shared by both shells: lines, input, cwd, history and the
+// keyboard handling (↑/↓ history, Tab completion, Ctrl+L, Ctrl+C).
+export function useTerminal({
+  onOpen,
+  onReboot,
+  onExit,
+}: {
+  onOpen: (app: AppId) => void
+  onReboot: () => void
+  onExit: () => void
+}) {
   const [lines, setLines] = useState<TermLine[]>(initialTerm)
   const [input, setInput] = useState('')
+  const [cwd, setCwd] = useState('~')
+  const history = useRef<string[]>([])
+  const histIdx = useRef(-1)
+  const startedAt = useRef(Date.now())
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const run = useCallback(
     (cmd: string) => {
-      const res = runCommand(cmd)
-      if (res.action === 'clear') setLines([])
-      else if (res.action === 'reboot') {
-        setLines(initialTerm())
-        onReboot()
-      } else {
-        setLines((l) => [...l, ...res.lines])
-        if (res.open && res.open !== 'term') onOpen(res.open)
+      const trimmed = cmd.trim()
+      if (trimmed && history.current[history.current.length - 1] !== trimmed) history.current.push(trimmed)
+      histIdx.current = -1
+      setInput('')
+      const res = runCommand(cmd, { cwd, history: history.current, startedAt: startedAt.current, now: Date.now() })
+      if (res.action === 'clear') return setLines([])
+      // The shell remounts the terminal under the boot screen, so nothing to reset here.
+      if (res.action === 'reboot') return onReboot()
+      setLines((l) => [...l, ...res.lines])
+      setCwd(res.cwd)
+      const fx = res.effect
+      if (!fx) return
+      if (fx.open && fx.open !== 'term') onOpen(fx.open)
+      if (fx.url) window.open(fx.url, '_blank', 'noopener')
+      if (fx.download) {
+        const cv = profile.cvs.find((c) => c.lang === fx.download)
+        if (cv) {
+          const a = document.createElement('a')
+          a.href = cv.href
+          a.download = cv.file
+          a.click()
+        }
       }
+      if (fx.admin !== undefined) setAdminKey(fx.admin)
+      if (fx.exit) onExit()
     },
-    [onOpen, onReboot],
+    [cwd, onOpen, onReboot, onExit],
   )
+
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    const h = history.current
+    if (e.key === 'ArrowUp' && h.length) {
+      e.preventDefault()
+      histIdx.current = histIdx.current < 0 ? h.length - 1 : Math.max(0, histIdx.current - 1)
+      setInput(h[histIdx.current])
+    } else if (e.key === 'ArrowDown' && histIdx.current >= 0) {
+      e.preventDefault()
+      histIdx.current += 1
+      if (histIdx.current >= h.length) {
+        histIdx.current = -1
+        setInput('')
+      } else setInput(h[histIdx.current])
+    } else if (e.key === 'Tab') {
+      e.preventDefault()
+      const { value, options } = complete(input, cwd)
+      setInput(value)
+      if (options.length > 1)
+        setLines((l) => [...l, { kind: 'in', text: input, cwd }, { kind: 'out', text: options.join('   '), color: '#8fb3ad' }])
+    } else if (e.ctrlKey && e.key.toLowerCase() === 'l') {
+      e.preventDefault()
+      setLines([])
+    } else if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+      if (window.getSelection?.()?.toString()) return
+      e.preventDefault()
+      setLines((l) => [...l, { kind: 'in', text: input + '^C', cwd }])
+      setInput('')
+    }
+  }
 
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [lines])
 
-  return { lines, input, setInput, run, scrollRef }
+  const reset = useCallback(() => {
+    setLines(initialTerm())
+    setInput('')
+    setCwd('~')
+    history.current = []
+    histIdx.current = -1
+    startedAt.current = Date.now()
+  }, [])
+
+  return { lines, input, setInput, cwd, run, reset, onKeyDown, scrollRef }
 }
 
 export type Terminal = ReturnType<typeof useTerminal>

@@ -5,10 +5,14 @@ import { apps, formatClock, stripes } from '#/lib/os'
 import type { AppId } from '#/lib/os'
 import { blinkOn, markBooted, shouldSkipBoot, useNow, useTerminal } from '#/lib/hooks'
 import { useCvPicker } from './CvPicker'
-import { CvPaper, HudCorners, LogoBox, MailSent, ProgressBar, Shot, TerminalBody, Wordmark, useMailto } from './shared'
+import { CvPaper, HudCorners, LogoBox, MailSent, ProgressBar, Shot, Wordmark, useMailto } from './shared'
+import { TerminalBody } from './Terminal'
+import { ConfirmDelete, NoteEditor, NoteView, noteLimitHint } from './Notes'
+import { useNotes } from '#/lib/useNotes'
+import type { Note } from '#/lib/notes'
 
-const homeApps: (AppId | 'github')[] = ['work', 'photos', 'cv', 'mail', 'term', 'about', 'github']
-const chips = ['help', 'neofetch', 'ls', 'cat contact.txt', 'sudo hire petar', 'clear']
+const homeApps: (AppId | 'github')[] = ['work', 'photos', 'notes', 'cv', 'mail', 'term', 'about', 'github']
+const chips = ['help', 'projects', 'about', 'experience', 'ls', 'contact', 'cv', 'open notes', 'fortune', 'coffee', 'sudo hire petar', 'clear']
 
 const bootLines = bootLog.map((b) =>
   b[0] === 'o' ? { tag: '[  OK  ]', color: '#efab30', text: b[1] } : b[0] === 'l' ? { tag: `[${b[1]}]`, color: '#8fb3ad', text: b[2] } : { tag: '', color: '#f1ede4', text: b[1] },
@@ -39,11 +43,18 @@ export function Mobile({
     if (enabled) onActiveChange(appOpen ? app : null)
   }, [app, appOpen, enabled, onActiveChange])
 
+  const resetSession = useRef<() => void>(() => {})
   const boot = useCallback(() => {
     clearInterval(timer.current)
     setPhase('boot')
     setProgress(0)
-    setAppOpen(false)
+    // The boot screen covers everything first; then the session resets underneath.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        setAppOpen(false)
+        resetSession.current()
+      }),
+    )
     let p = 0
     timer.current = setInterval(() => {
       p += 1.4
@@ -80,8 +91,9 @@ export function Mobile({
   }, [enabled, initialApp, openApp, boot])
   useEffect(() => () => clearInterval(timer.current), [])
 
-  const term = useTerminal({ onOpen: openApp, onReboot: boot })
-  const back = () => setAppOpen(false)
+  const back = useCallback(() => setAppOpen(false), [])
+  const term = useTerminal({ onOpen: openApp, onReboot: boot, onExit: back })
+  resetSession.current = term.reset
 
   // Lock screen: tap or swipe up.
   const touchY = useRef<number | null>(null)
@@ -90,6 +102,7 @@ export function Mobile({
   const subtitle: Record<AppId, string> = {
     work: `${projects.length} repos`,
     photos: `${photos.length} frames`,
+    notes: 'guest notes',
     cv: 'pdf · en / hr',
     mail: 'new message',
     term: 'guest@pop-os',
@@ -196,6 +209,7 @@ export function Mobile({
             </div>
           )}
           {app === 'about' && <AboutApp />}
+          {app === 'notes' && <NotesApp />}
         </div>
         {app === 'term' && (
           <div className="thin-scroll absolute inset-x-0 bottom-6 flex gap-1.5 overflow-x-auto border-t border-deep bg-ink px-3 py-2.5">
@@ -277,8 +291,12 @@ export function Mobile({
       <div
         data-boot
         aria-hidden={phase !== 'boot'}
-        className="absolute inset-0 z-[60] bg-ink transition-opacity duration-600"
-        style={{ opacity: phase === 'boot' ? 1 : 0, pointerEvents: phase === 'boot' ? 'auto' : 'none' }}
+        className="absolute inset-0 z-[60] bg-ink"
+        style={{
+          opacity: phase === 'boot' ? 1 : 0,
+          pointerEvents: phase === 'boot' ? 'auto' : 'none',
+          transition: phase === 'boot' ? 'none' : 'opacity .6s',
+        }}
       >
         <HudCorners size={26} inset={18} top={50} bottom={40} />
         <div className="absolute inset-x-0 top-[32%] flex flex-col items-center gap-5">
@@ -466,6 +484,80 @@ function AboutApp() {
           CV.pdf ↓
         </button>
       </div>
+    </div>
+  )
+}
+
+function NotesApp() {
+  const { status, notes, mineLeft, admin, remove } = useNotes()
+  const [open, setOpen] = useState<string | 'new' | null>(null)
+  const [confirm, setConfirm] = useState<Note | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const current = open && open !== 'new' ? notes.find((n) => n.id === open) : undefined
+  const del = async (n: Note) => {
+    setConfirm(null)
+    const err = await remove(n.id)
+    setError(err)
+    if (!err) setOpen(null)
+  }
+
+  if (open === 'new' || current) {
+    return (
+      <div className="flex min-h-full flex-col gap-3 p-4">
+        <button type="button" onClick={() => setOpen(null)} className="cursor-pointer self-start border-0 bg-transparent p-0 font-mono text-xs text-dim">
+          ← all notes
+        </button>
+        <h3 className="m-0 truncate font-sans text-2xl font-extrabold">{current ? current.name : 'New note'}</h3>
+        {open === 'new' ? (
+          <NoteEditor compact onSaved={(n) => setOpen(n.id)} onCancel={() => setOpen(null)} />
+        ) : current!.mine ? (
+          <NoteEditor compact key={current!.id} note={current} onSaved={() => setOpen(null)} onDelete={() => setConfirm(current!)} />
+        ) : (
+          <>
+            <NoteView note={current!} />
+            {admin && (
+              <button type="button" onClick={() => setConfirm(current!)} className="h-11 cursor-pointer border border-signal bg-transparent font-mono text-xs text-signal">
+                Delete (admin)
+              </button>
+            )}
+          </>
+        )}
+        {confirm && <ConfirmDelete name={confirm.name} onConfirm={() => void del(confirm)} onCancel={() => setConfirm(null)} />}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      <p className="m-0 font-sans text-sm leading-[1.5] text-muted">Leave Petar a note. Everyone who opens Notes can read it; you can edit or delete your own.</p>
+      {status === 'ready' && (
+        <button
+          type="button"
+          disabled={mineLeft === 0}
+          onClick={() => setOpen('new')}
+          className="h-12 cursor-pointer border-0 bg-amber font-mono text-[13px] font-bold text-ink disabled:cursor-default disabled:opacity-50"
+        >
+          + New note <span className="font-normal">· {noteLimitHint(mineLeft)}</span>
+        </button>
+      )}
+      {status === 'loading' && <p className="m-0 text-xs text-dim">loading notes…</p>}
+      {status === 'offline' && <p className="m-0 text-xs text-dim">Notes aren't connected yet.</p>}
+      {status === 'error' && <p className="m-0 text-xs text-signal">Could not load notes.</p>}
+      {error && <p className="m-0 text-xs text-signal">{error}</p>}
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {notes.map((n) => (
+          <li key={n.id}>
+            <button type="button" onClick={() => setOpen(n.id)} className="flex w-full cursor-pointer flex-col gap-1 border border-deep bg-transparent p-3 text-left text-paper">
+              <span className="flex w-full items-center justify-between gap-2">
+                <span className="truncate font-mono text-[13px] font-bold">{n.name}</span>
+                {n.mine && <span className="text-[10px] text-amber">yours</span>}
+              </span>
+              <span className="line-clamp-2 font-sans text-sm text-muted">{n.text}</span>
+              {n.sig && <span className="font-sans text-xs text-amber">— {n.sig}</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

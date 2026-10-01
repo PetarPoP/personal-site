@@ -1,8 +1,7 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { certificates, education, experience, languages, otherWork, profile, skills } from '#/data/portfolio'
 import { stripes } from '#/lib/os'
-import type { Terminal } from '#/lib/hooks'
 
 // A photo or screenshot: the real image when there is one, the striped placeholder otherwise.
 export function Shot({
@@ -74,114 +73,6 @@ export function ProgressBar({ width, value }: { width: number; value: number }) 
   return (
     <div className="h-[3px] bg-deep" style={{ width }} role="progressbar" aria-valuenow={Math.round(value)} aria-valuemin={0} aria-valuemax={100}>
       <div className="h-full bg-amber shadow-[0_0_12px_#efab30]" style={{ width: `${value}%` }} />
-    </div>
-  )
-}
-
-// ---- Terminal -------------------------------------------------------------
-
-const ascii = ' ██████╗ \n ██╔══██╗\n ██████╔╝\n ██╔═══╝ \n ██║     \n ╚═╝     '
-const swatches = ['#1c3132', '#476762', '#efab30', '#df5e00', '#f1ede4']
-
-function Neofetch({ compact }: { compact: boolean }) {
-  const rows: [string, string][] = compact
-    ? [
-        ['OS', 'PopOS 26.10 mobile'],
-        ['User', profile.name],
-        ['Role', profile.roles],
-        ['Stack', 'Next.js · React · C/C++'],
-      ]
-    : [
-        ['OS', 'PopOS 26.10 "Livno"'],
-        ['User', profile.name],
-        ['Role', profile.roles],
-        ['Uptime', '5th year of CS, Split'],
-        ['Stack', 'Next.js · React · TanStack'],
-        ['Embedded', 'C · STM32 · CAN'],
-        ['Lens', 'always on'],
-      ]
-  const pad = compact ? 7 : 10
-  return (
-    <div className={`my-1.5 mb-2.5 flex ${compact ? 'flex-col gap-2' : 'items-start gap-7'}`}>
-      <div className={`font-bold whitespace-pre text-amber ${compact ? 'text-[11px] leading-[1.2]' : 'text-[13px] leading-[1.25]'}`}>{ascii}</div>
-      <div className="flex flex-col">
-        {!compact && (
-          <>
-            <div>
-              <span className="font-bold text-amber">guest</span>@<span className="font-bold text-amber">pop-os</span>
-            </div>
-            <div className="text-teal">----------------------</div>
-          </>
-        )}
-        {rows.map(([k, v]) => (
-          <div key={k} className="whitespace-pre-wrap">
-            <span className="text-signal">{k}</span>
-            {' '.repeat(Math.max(1, pad - k.length))}
-            {v}
-          </div>
-        ))}
-        {!compact && (
-          <div className="mt-2 flex">
-            <span className="h-3 w-6 border border-teal bg-ink" />
-            {swatches.map((c) => (
-              <span key={c} className="h-3 w-6" style={{ background: c }} />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-export function TerminalBody({ term, compact = false, user = 'guest@pop-os' }: { term: Terminal; compact?: boolean; user?: string }) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  return (
-    <div
-      onClick={() => {
-        if (!String(window.getSelection?.() ?? '')) inputRef.current?.focus()
-      }}
-      className="cursor-text select-text"
-    >
-      {term.lines.map((l, i) =>
-        l.kind === 'in' ? (
-          <div key={i} className="whitespace-pre-wrap">
-            <span className="text-amber">{user}</span>
-            <span className="text-mist">:~$ </span>
-            {l.text}
-          </div>
-        ) : l.kind === 'out' ? (
-          <div key={i} className="whitespace-pre-wrap" style={{ color: l.color ?? '#f1ede4' }}>
-            {l.text}
-          </div>
-        ) : (
-          <Neofetch key={i} compact={compact} />
-        ),
-      )}
-      <form
-        className="flex"
-        onSubmit={(e) => {
-          e.preventDefault()
-          term.run(term.input)
-          term.setInput('')
-        }}
-      >
-        <label htmlFor={compact ? 'term-m' : 'term-d'} className="whitespace-pre">
-          <span className="text-amber">{user}</span>
-          <span className="text-mist">:~$ </span>
-          <span className="sr-only">command</span>
-        </label>
-        <input
-          id={compact ? 'term-m' : 'term-d'}
-          ref={inputRef}
-          value={term.input}
-          onChange={(e) => term.setInput(e.target.value)}
-          spellCheck={false}
-          autoComplete="off"
-          autoCapitalize="off"
-          enterKeyHint="send"
-          className="min-w-0 flex-1 border-0 bg-transparent p-0 font-[inherit] text-paper caret-amber outline-none focus-visible:outline-none"
-        />
-      </form>
     </div>
   )
 }
