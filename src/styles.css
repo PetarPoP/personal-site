@@ -1,18 +1,16 @@
 @import 'tailwindcss';
 
-/* Palette from the design brief: teal-black ground, teal structure,
-   amber primary, orange signal. */
+/* POP/OS palette from the design handoff. */
 @theme {
-  --color-ink: #0d1b1c;
-  --color-deep: #1c3132;
-  --color-teal: #476762;
-  --color-mist: #8fb3ad;
-  --color-amber: #efab30;
-  --color-signal: #df5e00;
-  --color-paper: #f1ede4;
-  --color-dim: color-mix(in srgb, #476762 15%, #f1ede4);
-  --color-caption: color-mix(in srgb, #476762 30%, #f1ede4);
-  --color-label: color-mix(in srgb, #476762 45%, #f1ede4);
+  --color-ink: #0d1b1c; /* page / window background */
+  --color-deep: #1c3132; /* title bars, sidebars, hover fills, grid lines */
+  --color-teal: #476762; /* borders, inactive window border */
+  --color-mist: #8fb3ad; /* terminal :~$, boot timestamps, ls output */
+  --color-amber: #efab30; /* primary accent */
+  --color-signal: #df5e00; /* close hover, REC dot, errors */
+  --color-paper: #f1ede4; /* primary text, CV paper */
+  --color-muted: #bec5bd; /* secondary text */
+  --color-dim: #a5b0a9; /* tertiary labels */
 
   --font-sans: 'Figtree', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
@@ -27,10 +25,10 @@
     margin: 0;
     background: var(--color-ink);
     color: var(--color-paper);
-    font-family: var(--font-sans);
-    font-size: 15px;
+    font-family: var(--font-mono);
+    font-size: 13px;
     line-height: 1.55;
-    overflow-x: hidden;
+    overflow: hidden;
   }
   ::selection {
     background: color-mix(in srgb, var(--color-amber) 35%, transparent);
@@ -42,46 +40,74 @@
     outline: 2px solid var(--color-amber);
     outline-offset: 2px;
   }
-  /* The HUD and the scroll engine replace the page scrollbar. */
-  html::-webkit-scrollbar {
-    width: 0;
+  /* Square corners everywhere; native controls included. */
+  button,
+  input,
+  textarea {
+    border-radius: 0;
   }
-  html {
-    scrollbar-width: none;
+}
+
+@utility thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-teal) transparent;
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-teal);
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
   }
 }
 
-@utility stripes {
-  background: repeating-linear-gradient(
-    135deg,
-    var(--stripe, var(--color-deep)) 0 1px,
-    var(--color-ink) 1px 10px
-  );
+@utility desk-grid {
+  background-color: var(--color-ink);
+  background-image:
+    repeating-linear-gradient(90deg, var(--color-deep) 0 1px, transparent 1px 80px),
+    repeating-linear-gradient(0deg, var(--color-deep) 0 1px, transparent 1px 80px);
 }
 
-@utility scanlines {
-  background: repeating-linear-gradient(
-    0deg,
-    oklch(1 0 0 / 0.03) 0 1px,
-    transparent 1px 3px
-  );
+@utility phone-grid {
+  background-color: var(--color-ink);
+  background-image:
+    repeating-linear-gradient(90deg, var(--color-deep) 0 1px, transparent 1px 49px),
+    repeating-linear-gradient(0deg, var(--color-deep) 0 1px, transparent 1px 49px);
 }
 
-@utility grid-rules {
-  background-image: repeating-linear-gradient(
-    90deg,
-    var(--color-deep) 0 1px,
-    transparent 1px 94.5px
-  );
-}
-
-@utility outline-text {
+/* The giant outlined name on the desktop wallpaper. */
+@utility outline-name {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-size: clamp(160px, 15.6vw, 300px);
+  line-height: 0.8;
+  letter-spacing: -0.06em;
+  white-space: nowrap;
   color: transparent;
-  -webkit-text-stroke: 2px var(--color-signal);
+  -webkit-text-stroke-width: 1.5px;
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(-4px);
+  }
+  50% {
+    transform: translateY(4px);
+  }
+}
+
+@utility bob {
+  animation: bob 1.9s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-fx='scramble'] {
-    opacity: 1 !important;
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+    animation: none !important;
   }
 }
