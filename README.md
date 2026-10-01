@@ -5,7 +5,8 @@ The design is "POP/OS": the site boots like an operating system.
 
 - **Desktop (≥1024px):** boot log → splash → windowed desktop with a top bar, desktop icons, dock,
   draggable windows (Terminal, Files, CV viewer, Mail, Spotify) and a working terminal. Icons snap to a grid inside the
-  corner brackets; drag across the desktop (or ~/notes) to select several. Toasts confirm actions or say why one isn't allowed.
+  corner brackets; drag across the desktop (or ~/notes) to select several. Snap Layouts work like Windows 11: hover a
+  window's maximise button for layouts, or drag a window to a screen edge, corner or the top bar. Toasts confirm actions or say why one isn't allowed.
 - **Mobile (<1024px):** phone boot → lock screen → home screen; apps slide up full screen.
 
 ```bash

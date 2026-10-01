@@ -28,7 +28,45 @@ const WINDOW_SLUG: Record<WindowId, string> = { term: 'terminal', files: 'files'
 // Desktop icons, dock and app menu, in this order.
 const launchers: AppId[] = ['term', 'work', 'photos', 'notes', 'cv', 'mail', 'spotify']
 
-type Win = { open: boolean; min: boolean; max: boolean; pos: { x: number; y: number } | null; z: number }
+type Win = { open: boolean; min: boolean; max: boolean; snap: Zone | null; pos: { x: number; y: number } | null; z: number }
+
+// ---- Snap Layouts: zones as fractions of the screen below the top bar, like Windows 11.
+type Zone = 'left' | 'right' | 'l23' | 'r13' | 'tl' | 'tr' | 'bl' | 'br'
+const ZONES: Record<Zone, { x: number; y: number; w: number; h: number; label: string }> = {
+  left: { x: 0, y: 0, w: 1 / 2, h: 1, label: 'left half' },
+  right: { x: 1 / 2, y: 0, w: 1 / 2, h: 1, label: 'right half' },
+  l23: { x: 0, y: 0, w: 2 / 3, h: 1, label: 'left two thirds' },
+  r13: { x: 2 / 3, y: 0, w: 1 / 3, h: 1, label: 'right third' },
+  tl: { x: 0, y: 0, w: 1 / 2, h: 1 / 2, label: 'top left' },
+  tr: { x: 1 / 2, y: 0, w: 1 / 2, h: 1 / 2, label: 'top right' },
+  bl: { x: 0, y: 1 / 2, w: 1 / 2, h: 1 / 2, label: 'bottom left' },
+  br: { x: 1 / 2, y: 1 / 2, w: 1 / 2, h: 1 / 2, label: 'bottom right' },
+}
+const LAYOUTS: Zone[][] = [
+  ['left', 'right'],
+  ['l23', 'r13'],
+  ['left', 'tr', 'br'],
+  ['tl', 'tr', 'bl', 'br'],
+]
+const zoneRect = (z: Zone, W: number, H: number) => {
+  const r = ZONES[z]
+  const h = H - BAR
+  return { x: Math.round(r.x * W), y: BAR + Math.round(r.y * h), w: Math.round(r.w * W), h: Math.round(r.h * h) }
+}
+// Where a window dragged to (px, py) would snap: edges give halves, corners quarters, the top bar full screen.
+const EDGE = 6
+const CORNER = 120
+function dropZone(px: number, py: number, W: number, H: number): Zone | 'max' | null {
+  const left = px <= EDGE
+  const right = px >= W - EDGE
+  if (left || right) {
+    if (py <= BAR + CORNER) return left ? 'tl' : 'tr'
+    if (py >= H - CORNER) return left ? 'bl' : 'br'
+    return left ? 'left' : 'right'
+  }
+  if (py <= BAR + 2) return 'max'
+  return null
+}
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 // ---- desktop icon positions: snapped to the 80px wallpaper grid, kept in localStorage until a reboot or refresh.
@@ -287,7 +325,7 @@ function Session({
 
   // ---- windows
   const [wins, setWins] = useState<Record<WindowId, Win>>(() =>
-    Object.fromEntries(windowIds.map((id) => [id, { open: false, min: false, max: false, pos: null, z: 1 }])) as Record<
+    Object.fromEntries(windowIds.map((id) => [id, { open: false, min: false, max: false, snap: null, pos: null, z: 1 }])) as Record<
       WindowId,
       Win
     >,
@@ -337,7 +375,7 @@ function Session({
     [openWin],
   )
   const closeWin = useCallback((id: WindowId) => {
-    setWins((w) => ({ ...w, [id]: { ...w[id], open: false, max: false } }))
+    setWins((w) => ({ ...w, [id]: { ...w[id], open: false, max: false, snap: null } }))
     setActive((a) => (a === id ? null : a))
   }, [])
   const minWin = (id: WindowId) => {
@@ -348,13 +386,22 @@ function Session({
   const [resizing, setResizing] = useState<WindowId | null>(null)
   const resizeTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => () => clearTimeout(resizeTimer.current), [])
-  const maxWin = (id: WindowId) => {
+  const glide = (id: WindowId) => {
     setResizing(id)
     clearTimeout(resizeTimer.current)
     resizeTimer.current = setTimeout(() => setResizing(null), 340)
-    setWins((w) => ({ ...w, [id]: { ...w[id], max: !w[id].max } }))
+  }
+  const maxWin = (id: WindowId) => {
+    glide(id)
+    setWins((w) => ({ ...w, [id]: { ...w[id], max: !w[id].max && !w[id].snap, snap: null } }))
     focusWin(id)
   }
+  const snapWin = (id: WindowId, zone: Zone) => {
+    glide(id)
+    setWins((w) => ({ ...w, [id]: { ...w[id], max: false, snap: zone } }))
+    focusWin(id)
+  }
+  const [snapPreview, setSnapPreview] = useState<Zone | 'max' | null>(null)
   const isRunning = (app: AppId) => {
     const f = appFolder[app]
     if (f) return wins.files.open && folder === f
@@ -369,10 +416,11 @@ function Session({
     else focusWin(id)
   }
 
-  const geom = (id: WindowId) => {
+  const geom = (id: WindowId, free = false) => {
     const { W, H } = size
     const d = DEF[id]
-    if (wins[id].max) return { x: 0, y: BAR, w: W, h: H - BAR }
+    if (!free && wins[id].max) return { x: 0, y: BAR, w: W, h: H - BAR }
+    if (!free && wins[id].snap) return zoneRect(wins[id].snap, W, H)
     const kx = W / 1280
     const ky = H / 800
     const w = Math.min(d.w * clamp(kx, 0.8, 1.3), W - 24)
@@ -390,21 +438,42 @@ function Session({
   useEffect(() => () => endDrag.current?.(), [])
   const startDrag = (id: WindowId, e: ReactPointerEvent) => {
     if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return
-    if (wins[id].max) return
     e.preventDefault()
     focusWin(id)
-    const g = geom(id)
+    const docked = wins[id].max || !!wins[id].snap
+    const cur = geom(id)
+    let g = cur
     const sx = e.clientX
     const sy = e.clientY
+    let moved = false
+    let zone: Zone | 'max' | null = null
     const move = (ev: PointerEvent) => {
+      if (!moved) {
+        if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 4) return
+        moved = true
+        if (docked) {
+          // Pulling a snapped or full-screen window off restores its normal size under the cursor.
+          const free = geom(id, true)
+          const fx = (sx - cur.x) / cur.w
+          g = { ...free, x: sx - free.w * fx, y: BAR }
+          setWins((w) => ({ ...w, [id]: { ...w[id], max: false, snap: null } }))
+        }
+      }
       const x = Math.round(clamp(g.x + ev.clientX - sx, 80 - g.w, size.W - 80))
       const y = Math.round(clamp(g.y + ev.clientY - sy, BAR, size.H - 60))
       patch(id, { pos: { x, y } })
+      zone = dropZone(ev.clientX, ev.clientY, size.W, size.H)
+      setSnapPreview(zone)
     }
     const up = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
       endDrag.current = null
+      setSnapPreview(null)
+      if (zone === 'max') {
+        glide(id)
+        patch(id, { max: true, snap: null })
+      } else if (zone) snapWin(id, zone)
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
@@ -597,6 +666,8 @@ function Session({
         onDrag={(e) => startDrag(id, e)}
         onMin={() => minWin(id)}
         onMax={() => maxWin(id)}
+        onSnap={(z) => snapWin(id, z)}
+        docked={w.max || !!w.snap}
         onClose={() => closeWin(id)}
       >
         {children}
@@ -700,6 +771,17 @@ function Session({
       )}
       {win('mail', 'Mail — new message', <MailApp />)}
       {win('spotify', 'Spotify', <SpotifyPlayer active={wins.spotify.open && !wins.spotify.min && ready} />)}
+
+      {snapPreview && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute z-[850] border-2 border-amber bg-amber/10 backdrop-blur-[2px] transition-all duration-150"
+          style={(() => {
+            const r = snapPreview === 'max' ? { x: 0, y: BAR, w: size.W, h: size.H - BAR } : zoneRect(snapPreview, size.W, size.H)
+            return { left: r.x + 6, top: r.y + 6, width: r.w - 12, height: r.h - 12 }
+          })()}
+        />
+      )}
 
       {/* Top bar */}
       <header className="absolute inset-x-0 top-0 z-[900] flex h-[34px] items-center gap-4 border-b border-deep bg-ink/92 pr-3.5 pl-1.5 text-xs font-medium">
@@ -863,6 +945,8 @@ function Window({
   onDrag,
   onMin,
   onMax,
+  onSnap,
+  docked,
   onClose,
   children,
 }: {
@@ -877,9 +961,27 @@ function Window({
   onDrag: (e: ReactPointerEvent) => void
   onMin: () => void
   onMax: () => void
+  onSnap: (z: Zone) => void
+  docked: boolean
   onClose: () => void
   children: ReactNode
 }) {
+  // Hovering the maximise button opens the Snap Layouts flyout, as in Windows 11.
+  const maxRef = useRef<HTMLButtonElement>(null)
+  const [flyout, setFlyout] = useState<{ x: number; y: number } | null>(null)
+  const hoverTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(hoverTimer.current), [])
+  const showFlyout = (delay: number) => {
+    clearTimeout(hoverTimer.current)
+    hoverTimer.current = setTimeout(() => {
+      const r = maxRef.current?.getBoundingClientRect()
+      if (r) setFlyout({ x: Math.min(r.right - 228, window.innerWidth - 240), y: r.bottom + 6 })
+    }, delay)
+  }
+  const hideFlyout = () => {
+    clearTimeout(hoverTimer.current)
+    hoverTimer.current = setTimeout(() => setFlyout(null), 220)
+  }
   const border = focused ? '#efab30' : '#476762'
   const btn = 'h-6 w-[26px] cursor-pointer border border-teal bg-transparent font-mono text-xs font-medium text-paper'
   return (
@@ -916,14 +1018,65 @@ function Window({
         <button type="button" aria-label="Minimise" onClick={(e) => (e.stopPropagation(), onMin())} className={`${btn} hover:bg-teal`}>
           –
         </button>
-        <button type="button" aria-label="Maximise" onClick={(e) => (e.stopPropagation(), onMax())} className={`${btn} hover:bg-teal`}>
-          □
+        <button
+          ref={maxRef}
+          type="button"
+          aria-label={docked ? 'Restore' : 'Maximise'}
+          aria-haspopup="menu"
+          aria-expanded={!!flyout}
+          onClick={(e) => (e.stopPropagation(), setFlyout(null), clearTimeout(hoverTimer.current), onMax())}
+          onPointerEnter={() => showFlyout(380)}
+          onPointerLeave={hideFlyout}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault()
+              showFlyout(0)
+            }
+          }}
+          className={`${btn} hover:bg-teal`}
+        >
+          {docked ? '❐' : '□'}
         </button>
         <button type="button" aria-label="Close" onClick={(e) => (e.stopPropagation(), onClose())} className={`${btn} hover:border-signal hover:bg-signal hover:text-ink`}>
           ×
         </button>
       </div>
       {children}
+      {flyout && visible && (
+        <div
+          role="menu"
+          aria-label="Snap layouts"
+          onPointerEnter={() => clearTimeout(hoverTimer.current)}
+          onPointerLeave={hideFlyout}
+          onKeyDown={(e) => e.key === 'Escape' && setFlyout(null)}
+          className="fixed z-[2000] grid w-[228px] grid-cols-2 gap-2 border border-teal bg-ink p-2.5 shadow-[0_18px_40px_rgba(0,0,0,.6)]"
+          style={{ left: flyout.x, top: flyout.y }}
+        >
+          {LAYOUTS.map((layout, i) => (
+            <div key={i} className="relative h-[58px] border border-deep bg-deep/40">
+              {layout.map((z) => {
+                const r = ZONES[z]
+                return (
+                  <button
+                    key={z}
+                    type="button"
+                    role="menuitem"
+                    aria-label={`Snap to ${r.label}`}
+                    title={r.label}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setFlyout(null)
+                      onSnap(z)
+                    }}
+                    className="absolute cursor-pointer border border-teal bg-teal/30 p-0 hover:border-amber hover:bg-amber focus-visible:border-amber focus-visible:bg-amber"
+                    style={{ left: `calc(${r.x * 100}% + 2px)`, top: `calc(${r.y * 100}% + 2px)`, width: `calc(${r.w * 100}% - 4px)`, height: `calc(${r.h * 100}% - 4px)` }}
+                  />
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }
