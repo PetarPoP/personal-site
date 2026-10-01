@@ -19,7 +19,9 @@ npm run build    # production build (SSR)
 
 - `src/data/portfolio.ts` — all copy: profile, projects, photos, CV (experience, education, skills), boot log.
   Put photos/screenshots in `public/` and set `src` / `image` / `portrait` / `lockWallpaper` to swap out the striped placeholders.
-- `public/petar-popovic-cv-en.pdf`, `public/petar-popovic-cv-hr.pdf` — the EN/HR CVs behind every "Download CV" button (a language picker opens first).
+- `public/petar-popovic-cv-en.pdf`, `public/petar-popovic-cv-hr.pdf` — the EN/HR CVs behind every "Download CV" button (a language picker opens first). The CV window shows
+  `public/petar-popovic-cv-{en,hr}.png`, page images of those PDFs. After changing a PDF, regenerate them with
+  `pdftoppm -r 200 -png -singlefile public/petar-popovic-cv-en.pdf public/petar-popovic-cv-en` (and the same for `hr`).
 - `src/lib/os.ts` — app list and clock formatting.
 - `src/lib/terminal.ts` — the terminal: a small fake filesystem and the command parser shared by desktop and mobile.
 - `src/lib/spotify.ts` — server function for the Spotify app (current or last played song); `src/components/os/Spotify.tsx` shows it.

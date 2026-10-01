@@ -8,7 +8,8 @@ import { useCvPicker } from './CvPicker'
 import { ContextMenu } from './ContextMenu'
 import type { MenuItem, MenuState } from './ContextMenu'
 import { FilesWindow } from './Files'
-import { CvPaper, HudCorners, LogoBox, MailSent, ProgressBar, Wordmark, useMailto } from './shared'
+import { CvDocument, CvLangSwitch, HudCorners, LogoBox, MailSent, ProgressBar, Wordmark, useMailto } from './shared'
+import type { CvLang } from './shared'
 import { SpotifyPlayer } from './Spotify'
 import { toast } from './Toaster'
 import { TerminalBody } from './Terminal'
@@ -333,6 +334,7 @@ function Session({
   const zRef = useRef(2)
   const [active, setActive] = useState<WindowId | null>(null)
   const [folder, setFolder] = useState<Folder>('projects')
+  const [cvLang, setCvLang] = useState<CvLang>('EN')
   const [menu, setMenu] = useState(false)
   const [ctx, setCtx] = useState<MenuState>(null)
   const closeCtx = useCallback(() => setCtx(null), [])
@@ -755,17 +757,17 @@ function Session({
       {win('files', `Files — ~/${folder}`, <FilesWindow folder={folder} setFolder={setFolder} openWin={openWin} openMenu={openMenu} />)}
       {win(
         'cv',
-        'petar-popovic-cv-en.pdf',
+        `petar-popovic-cv-${cvLang.toLowerCase()}.pdf`,
         <>
           <div className="flex h-[42px] flex-none items-center gap-3.5 border-b border-deep px-3 text-[11px] text-dim">
+            <CvLangSwitch lang={cvLang} setLang={setCvLang} />
             <span>page 1 / 1</span>
-            <span>100%</span>
             <button type="button" onClick={openCv} className="ml-auto cursor-pointer border-0 bg-amber px-3 py-[7px] font-mono text-[11px] font-bold text-ink hover:bg-signal">
               Download ↓
             </button>
           </div>
           <div className="thin-scroll min-h-0 flex-1 overflow-auto bg-deep p-[22px]">
-            <CvPaper />
+            <CvDocument lang={cvLang} />
           </div>
         </>,
       )}
