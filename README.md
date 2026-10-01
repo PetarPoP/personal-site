@@ -4,7 +4,8 @@ Personal CV / portfolio site built with [TanStack Start](https://tanstack.com/st
 The design is "POP/OS": the site boots like an operating system.
 
 - **Desktop (≥1024px):** boot log → splash → windowed desktop with a top bar, desktop icons, dock,
-  draggable windows (Terminal, Files, Photos, CV viewer, Mail) and a working terminal.
+  draggable windows (Terminal, Files, CV viewer, Mail, Spotify) and a working terminal. Icons snap to a grid inside the
+  corner brackets; drag across the desktop (or ~/notes) to select several. Toasts confirm actions or say why one isn't allowed.
 - **Mobile (<1024px):** phone boot → lock screen → home screen; apps slide up full screen.
 
 ```bash
@@ -17,15 +18,16 @@ npm run build    # production build (SSR)
 
 - `src/data/portfolio.ts` — all copy: profile, projects, photos, CV (experience, education, skills), boot log.
   Put photos/screenshots in `public/` and set `src` / `image` / `portrait` / `lockWallpaper` to swap out the striped placeholders.
-- `public/cv.pdf`, `public/cv-hr.pdf` — the EN/HR CVs behind every "Download CV" button (a language picker opens first).
+- `public/petar-popovic-cv-en.pdf`, `public/petar-popovic-cv-hr.pdf` — the EN/HR CVs behind every "Download CV" button (a language picker opens first).
 - `src/lib/os.ts` — app list and clock formatting.
 - `src/lib/terminal.ts` — the terminal: a small fake filesystem and the command parser shared by desktop and mobile.
+- `src/lib/spotify.ts` — server function for the Spotify app (current or last played song); `src/components/os/Spotify.tsx` shows it.
 - `src/lib/notes.ts` — server functions for guest notes (`~/notes`); `src/lib/useNotes.tsx` is the client side.
 - `src/components/os/` — `Desktop.tsx` (windows, draggable icons, right-click menu), `Files.tsx` (one explorer for
   ~/projects, ~/photos, ~/notes), `Notes.tsx`, `Terminal.tsx`, `Mobile.tsx`, shared pieces and the CV picker.
 - `src/styles.css` — palette (`@theme` tokens) and utilities.
 
-Deep links: `/?app=projects|photos|notes|cv|mail|about` opens that window/app directly and skips the boot.
+Deep links: `/?app=projects|photos|notes|cv|mail|spotify|about` opens that window/app directly and skips the boot.
 The boot plays once per browser session and is skipped with `prefers-reduced-motion`.
 The Mail app has no backend: "Send" opens the visitor's mail app with the message filled in.
 
@@ -41,3 +43,15 @@ up to 3 (also capped per IP) and can edit, rename or delete only its own. Notes 
 3. Redeploy.
 
 Without those variables, `npm run dev` keeps notes in memory, and production shows "Notes aren't connected yet."
+
+## Spotify
+
+The Spotify app shows the song playing right now, or the last one played. Set these in Vercel → Settings → Environment Variables
+and redeploy:
+
+- `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` — from the app at developer.spotify.com
+- `SPOTIFY_REFRESH_TOKEN` — a refresh token for your account with the `user-read-currently-playing` and
+  `user-read-recently-played` scopes
+
+Spotify is asked at most every 15 seconds per server instance. Locally, `SPOTIFY_MOCK=1 npm run dev` shows a fixed song
+(`SPOTIFY_MOCK=recent` shows it as last played).

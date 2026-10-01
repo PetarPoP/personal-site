@@ -13,8 +13,8 @@ export const profile = {
   github: 'https://github.com/PetarPoP',
   githubLabel: 'github.com/PetarPoP',
   cvs: [
-    { lang: 'EN', label: 'English', href: '/cv.pdf', file: 'PetarPopovic_CV_EN.pdf' },
-    { lang: 'HR', label: 'Hrvatski', href: '/cv-hr.pdf', file: 'PetarPopovic_CV_HRV.pdf' },
+    { lang: 'EN', label: 'English', href: '/petar-popovic-cv-en.pdf', file: 'petar-popovic-cv-en.pdf' },
+    { lang: 'HR', label: 'Hrvatski', href: '/petar-popovic-cv-hr.pdf', file: 'petar-popovic-cv-hr.pdf' },
   ],
   summary:
     'Fifth-year Computer Science student with hands-on experience in full-stack web development (Next.js) and embedded systems programming (C/C++, Python). Currently focused on bridging these two domains, from developing intuitive user interfaces to writing code for real-time hardware communication.',

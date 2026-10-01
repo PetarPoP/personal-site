@@ -6,13 +6,15 @@ import type { AppId } from '#/lib/os'
 import { blinkOn, markBooted, shouldSkipBoot, useNow, useTerminal } from '#/lib/hooks'
 import { useCvPicker } from './CvPicker'
 import { CvPaper, HudCorners, LogoBox, MailSent, ProgressBar, Shot, Wordmark, useMailto } from './shared'
+import { SpotifyPlayer } from './Spotify'
+import { toast } from './Toaster'
 import { TerminalBody } from './Terminal'
 import { ConfirmDelete, NoteEditor, NoteView, noteLimitHint } from './Notes'
 import { useNotes } from '#/lib/useNotes'
 import type { Note } from '#/lib/notes'
 
-const homeApps: (AppId | 'github')[] = ['work', 'photos', 'notes', 'cv', 'mail', 'term', 'about', 'github']
-const chips = ['help', 'projects', 'about', 'experience', 'ls', 'contact', 'cv', 'open notes', 'fortune', 'coffee', 'sudo hire petar', 'clear']
+const homeApps: (AppId | 'github')[] = ['work', 'photos', 'notes', 'cv', 'mail', 'spotify', 'term', 'about', 'github']
+const chips = ['help', 'projects', 'about', 'experience', 'ls', 'contact', 'cv', 'open notes', 'spotify', 'fortune', 'coffee', 'sudo hire petar', 'clear']
 
 const bootLines = bootLog.map((b) =>
   b[0] === 'o' ? { tag: '[  OK  ]', color: '#efab30', text: b[1] } : b[0] === 'l' ? { tag: `[${b[1]}]`, color: '#8fb3ad', text: b[2] } : { tag: '', color: '#f1ede4', text: b[1] },
@@ -105,6 +107,7 @@ export function Mobile({
     notes: 'guest notes',
     cv: 'pdf · en / hr',
     mail: 'new message',
+    spotify: 'now playing',
     term: 'guest@pop-os',
     about: 'petar popović',
   }
@@ -210,6 +213,7 @@ export function Mobile({
           )}
           {app === 'about' && <AboutApp />}
           {app === 'notes' && <NotesApp />}
+          {app === 'spotify' && <SpotifyPlayer active={appOpen && phase === 'home'} compact />}
         </div>
         {app === 'term' && (
           <div className="thin-scroll absolute inset-x-0 bottom-6 flex gap-1.5 overflow-x-auto border-t border-deep bg-ink px-3 py-2.5">
@@ -498,7 +502,11 @@ function NotesApp() {
     setConfirm(null)
     const err = await remove(n.id)
     setError(err)
-    if (!err) setOpen(null)
+    if (err) toast.error(err)
+    else {
+      toast.success(`Deleted ${n.name}`)
+      setOpen(null)
+    }
   }
 
   if (open === 'new' || current) {

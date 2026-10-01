@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Desktop } from "#/components/os/Desktop";
 import { Mobile } from "#/components/os/Mobile";
 import { CvPickerProvider } from "#/components/os/CvPicker";
+import { Toaster } from "#/components/os/Toaster";
 import { NotesProvider } from "#/lib/useNotes";
 import { appFromSlug, apps, appSlugs } from "#/lib/os";
 import type { AppId } from "#/lib/os";
@@ -57,6 +58,7 @@ function Home() {
             onActiveChange={syncUrl}
           />
         </main>
+        <Toaster mobile={isDesktop === false} />
       </CvPickerProvider>
     </NotesProvider>
   );
