@@ -20,7 +20,7 @@ const DEF: Record<WindowId, { x: number; y: number; w: number; h: number }> = {
   files: { x: 130, y: 62, w: 920, h: 560 },
   cv: { x: 340, y: 48, w: 620, h: 700 },
   mail: { x: 420, y: 130, w: 540, h: 460 },
-  spotify: { x: 480, y: 170, w: 600, h: 300 },
+  spotify: { x: 560, y: 70, w: 400, h: 660 },
 }
 const WINDOW_NAME: Record<WindowId, string> = { term: 'Terminal', files: 'Files', cv: 'Document Viewer', mail: 'Mail', spotify: 'Spotify' }
 const WINDOW_SLUG: Record<WindowId, string> = { term: 'terminal', files: 'files', cv: 'cv', mail: 'mail', spotify: 'spotify' }
@@ -699,7 +699,7 @@ function Session({
         </>,
       )}
       {win('mail', 'Mail — new message', <MailApp />)}
-      {win('spotify', 'Spotify — now playing', <SpotifyPlayer active={wins.spotify.open && !wins.spotify.min && ready} />)}
+      {win('spotify', 'Spotify', <SpotifyPlayer active={wins.spotify.open && !wins.spotify.min && ready} />)}
 
       {/* Top bar */}
       <header className="absolute inset-x-0 top-0 z-[900] flex h-[34px] items-center gap-4 border-b border-deep bg-ink/92 pr-3.5 pl-1.5 text-xs font-medium">

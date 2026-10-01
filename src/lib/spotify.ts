@@ -142,7 +142,7 @@ async function fetchNowPlaying(): Promise<NowPlaying> {
         title: 'Bezimena',
         artists: 'Azra',
         album: 'Sunčana strana ulice',
-        image: null,
+        image: process.env.SPOTIFY_MOCK_IMAGE ?? null,
         url: 'https://open.spotify.com',
         durationMs: 215_000,
       },
