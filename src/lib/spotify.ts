@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import { Redis } from '@upstash/redis'
 
 // What Petar is listening to on Spotify: the current song, or the last one played.
 // Needs SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET and a SPOTIFY_REFRESH_TOKEN with the
@@ -35,6 +36,45 @@ async function failure(res: Response, what: string) {
 }
 
 let token: { value: string; expires: number } | null = null
+
+// Spotify can hand out a new refresh token when the old one is used; the newest one is kept in
+// Upstash (or memory) so the site keeps working. It is tied to the SPOTIFY_REFRESH_TOKEN it grew
+// from, so putting a new token in Vercel replaces it.
+const REFRESH_KEY = 'popos:spotify-refresh'
+type SavedRefresh = { from: string; token: string }
+let memoryRefresh: SavedRefresh | null = null
+
+function redis() {
+  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL
+  const auth = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN
+  return url && auth ? new Redis({ url, token: auth }) : null
+}
+
+async function fingerprint(value: string) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`spotify:${value}`))
+  return [...new Uint8Array(buf)].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function currentRefresh(fromEnv: string) {
+  const from = await fingerprint(fromEnv)
+  try {
+    const saved = (await redis()?.get<SavedRefresh>(REFRESH_KEY)) ?? memoryRefresh
+    if (saved?.from === from && saved.token) return saved.token
+  } catch (e) {
+    console.error('[spotify] could not read the saved refresh token', e)
+  }
+  return fromEnv
+}
+
+async function saveRefresh(fromEnv: string, next: string) {
+  const saved = { from: await fingerprint(fromEnv), token: next }
+  memoryRefresh = saved
+  try {
+    await redis()?.set(REFRESH_KEY, saved)
+  } catch (e) {
+    console.error('[spotify] could not save the new refresh token', e)
+  }
+}
 let cached: { at: number; data: NowPlaying } | null = null
 const CACHE_MS = 15_000
 
@@ -59,8 +99,9 @@ const toTrack = (t: SpotifyTrack): Track => {
   }
 }
 
-async function accessToken(id: string, secret: string, refresh: string) {
+async function accessToken(id: string, secret: string, envRefresh: string) {
   if (token && token.expires > Date.now() + 30_000) return token.value
+  const refresh = await currentRefresh(envRefresh)
   const res = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: {
@@ -75,11 +116,12 @@ async function accessToken(id: string, secret: string, refresh: string) {
       res.status === 400 && why.includes('invalid_client')
         ? `${why}. Check SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET.`
         : res.status === 400
-          ? `${why}. SPOTIFY_REFRESH_TOKEN must come from the same Spotify app as the client ID.`
+          ? `${why}. Make a new SPOTIFY_REFRESH_TOKEN with "npm run spotify-token" (see README) and redeploy.`
           : why,
     )
   }
-  const json = (await res.json()) as { access_token: string; expires_in: number }
+  const json = (await res.json()) as { access_token: string; expires_in: number; refresh_token?: string }
+  if (json.refresh_token && json.refresh_token !== refresh) await saveRefresh(envRefresh, json.refresh_token)
   token = { value: json.access_token, expires: Date.now() + json.expires_in * 1000 }
   return token.value
 }
