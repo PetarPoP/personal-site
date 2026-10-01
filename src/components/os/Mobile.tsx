@@ -12,7 +12,7 @@ import { toast } from './Toaster'
 import { TerminalBody } from './Terminal'
 import { ConfirmDelete, NoteEditor, NoteView, noteLimitHint } from './Notes'
 import { useNotes } from '#/lib/useNotes'
-import { usePhotos } from '#/lib/usePhotos'
+import { usePhotos, usePreload } from '#/lib/usePhotos'
 import type { Note } from '#/lib/notes'
 
 const homeApps: (AppId | 'github')[] = ['work', 'photos', 'notes', 'cv', 'mail', 'spotify', 'term', 'about', 'github']
@@ -409,6 +409,7 @@ function PhotosApp() {
   const at = list.findIndex((p) => p.key === viewer)
   const step = (dir: number) => setViewer(list[(at + dir + list.length) % list.length].key)
   const cur = at >= 0 ? list[at] : null
+  usePreload(cur ? [list[(at + 1) % list.length]?.full, list[(at - 1 + list.length) % list.length]?.full] : [])
   return (
     <div className="flex flex-col gap-3 p-3.5">
       {!gallery.live && (
@@ -465,6 +466,7 @@ function PhotosApp() {
           <Shot
             key={cur.key}
             src={cur.full}
+            preview={cur.src !== cur.full ? cur.src : undefined}
             tone={cur.tone}
             alt={cur.caption}
             className="flex-1"
