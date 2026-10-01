@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { toast } from './Toaster'
 
-// Right-click menu. Items can be disabled with a hint saying why.
-export type MenuItem = { label: string; onSelect?: () => void; disabled?: boolean; hint?: string; danger?: boolean } | 'sep'
+// Right-click menu. Items can be disabled with a hint saying why; picking one anyway
+// explains it in a toast (reason, or the hint).
+export type MenuItem = { label: string; onSelect?: () => void; disabled?: boolean; hint?: string; reason?: string; danger?: boolean } | 'sep'
 export type MenuState = { x: number; y: number; items: MenuItem[] } | null
 
 export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () => void }) {
@@ -13,7 +15,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
     if (!menu || !ref.current) return
     const r = ref.current.getBoundingClientRect()
     setPos({ x: Math.min(menu.x, window.innerWidth - r.width - 6), y: Math.min(menu.y, window.innerHeight - r.height - 6) })
-    ref.current.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+    ref.current.querySelector<HTMLButtonElement>('button:not([aria-disabled=true])')?.focus()
   }, [menu])
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
       onKeyDown={(e) => {
         if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
         e.preventDefault()
-        const items = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])]
+        const items = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button:not([aria-disabled=true])') ?? [])]
         const i = items.indexOf(document.activeElement as HTMLButtonElement)
         items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus()
       }}
@@ -56,13 +58,14 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
             key={i}
             role="menuitem"
             type="button"
-            disabled={item.disabled}
+            aria-disabled={item.disabled || undefined}
             title={item.disabled ? item.hint : undefined}
             onClick={() => {
               onClose()
-              item.onSelect?.()
+              if (item.disabled) toast.error(item.reason ?? `${item.label.replace(/^[^\w]+/, '')}: ${item.hint ?? 'not available'}`)
+              else item.onSelect?.()
             }}
-            className={`flex cursor-pointer items-center justify-between gap-4 border-0 bg-transparent px-2.5 py-[7px] text-left font-mono text-xs outline-none hover:bg-deep focus-visible:bg-deep disabled:cursor-default disabled:text-teal disabled:hover:bg-transparent ${item.danger ? 'text-signal' : 'text-paper'}`}
+            className={`flex cursor-pointer items-center justify-between gap-4 border-0 bg-transparent px-2.5 py-[7px] text-left font-mono text-xs outline-none hover:bg-deep focus-visible:bg-deep aria-disabled:cursor-not-allowed aria-disabled:text-teal aria-disabled:hover:bg-transparent ${item.danger ? 'text-signal' : 'text-paper'}`}
           >
             <span>{item.label}</span>
             {item.disabled && item.hint && <span className="text-[10px] text-teal">{item.hint}</span>}

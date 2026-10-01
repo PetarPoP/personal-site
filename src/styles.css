@@ -116,6 +116,28 @@
   animation: cursor-blink 1s steps(1) infinite;
 }
 
+/* Equaliser bars next to a song that is playing right now. */
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@utility eq-bar {
+  transform-origin: bottom;
+  animation: eq 0.9s ease-in-out infinite;
+}
+
+/* Drag-select rectangle on the desktop and in ~/notes. */
+@utility marquee {
+  border: 1px solid var(--color-amber);
+  background: color-mix(in srgb, var(--color-amber) 12%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

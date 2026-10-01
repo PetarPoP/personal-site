@@ -97,7 +97,7 @@ const appAliases: Record<string, AppId> = {
   cv: 'cv', resume: 'cv', docs: 'cv',
   mail: 'mail', contact: 'mail', email: 'mail',
   notes: 'notes', messages: 'notes',
-  terminal: 'term', about: 'about',
+  terminal: 'term', about: 'about', spotify: 'spotify', music: 'spotify',
 }
 
 export const commandHelp: { title: string; rows: [cmd: string, desc: string, run?: string][] }[] = [
@@ -128,7 +128,7 @@ export const commandHelp: { title: string; rows: [cmd: string, desc: string, run
       ['cd <dir>', 'change directory', 'cd projects'],
       ['cat <file>', 'print a file', 'cat about.txt'],
       ['pwd', 'current directory'],
-      ['open <app>', 'projects, photos, notes, cv, mail', 'open notes'],
+      ['open <app>', 'projects, photos, notes, cv, mail, spotify', 'open notes'],
     ],
   },
   {
@@ -149,6 +149,7 @@ export const commandHelp: { title: string; rows: [cmd: string, desc: string, run
     rows: [
       ['fortune', 'a random line'],
       ['coffee', 'take a break'],
+      ['spotify', 'what Petar is listening to'],
       ['sudo hire petar', 'the important one'],
     ],
   },
@@ -157,7 +158,7 @@ export const commandHelp: { title: string; rows: [cmd: string, desc: string, run
 export const commandNames = [
   'help', 'about', 'whoami', 'projects', 'project', 'experience', 'education', 'skills', 'contact', 'cv', 'open',
   'ls', 'cd', 'cat', 'pwd', 'github', 'email', 'neofetch', 'banner', 'date', 'uptime', 'echo', 'history',
-  'fortune', 'coffee', 'sudo', 'clear', 'reboot', 'exit', 'photos',
+  'fortune', 'coffee', 'sudo', 'clear', 'reboot', 'exit', 'photos', 'spotify',
 ]
 
 const fortunes = [
@@ -302,6 +303,9 @@ export function runCommand(raw: string, ctx: ShellContext): TermResult {
       say(`opening ${proj.name} on GitHub…`, C.muted)
       effect = { url: proj.href }
     } else say(arg ? `open: '${arg}' — try projects, photos, cv or mail` : 'usage: open <app>', C.orange)
+  } else if (name === 'spotify' || name === 'music' || name === 'np') {
+    say('opening Spotify…  ♫', C.muted)
+    effect = { open: 'spotify' }
   } else if (name === 'date') {
     say(new Date(ctx.now).toLocaleString('en-GB', { timeZone: 'Europe/Sarajevo', dateStyle: 'full', timeStyle: 'medium' }) + ' (Livno)')
   } else if (name === 'uptime') {

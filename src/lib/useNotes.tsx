@@ -48,6 +48,7 @@ type NotesApi = {
   load: () => Promise<void>
   save: (n: { id?: string; name: string; text: string; sig: string }) => Promise<NoteResult>
   remove: (id: string) => Promise<string | null>
+  removeMany: (ids: string[]) => Promise<{ deleted: number; error: string | null }>
 }
 
 const NotesContext = createContext<NotesApi | null>(null)
@@ -110,7 +111,29 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [load],
   )
 
-  const value = useMemo(() => ({ status, notes, mineLeft, admin, load, save, remove }), [status, notes, mineLeft, admin, load, save, remove])
+  const removeMany = useCallback<NotesApi['removeMany']>(
+    async (ids) => {
+      let deleted = 0
+      let error: string | null = null
+      for (const id of ids) {
+        try {
+          const res = await deleteNote({ data: { ...auth(), id } })
+          if (res.ok) deleted++
+          else error = res.error ?? 'Could not delete.'
+        } catch {
+          error = 'Could not delete. Check your connection.'
+        }
+      }
+      await load()
+      return { deleted, error }
+    },
+    [load],
+  )
+
+  const value = useMemo(
+    () => ({ status, notes, mineLeft, admin, load, save, remove, removeMany }),
+    [status, notes, mineLeft, admin, load, save, remove, removeMany],
+  )
   return <NotesContext.Provider value={value}>{children}</NotesContext.Provider>
 }
 

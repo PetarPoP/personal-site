@@ -1,7 +1,7 @@
 // The apps of POP/OS. On desktop, Projects, Photos and Notes are folders of one
 // Files window; mobile shows each as its own app and adds About.
-export type AppId = 'term' | 'work' | 'photos' | 'notes' | 'cv' | 'mail' | 'about'
-export const windowIds = ['term', 'files', 'cv', 'mail'] as const
+export type AppId = 'term' | 'work' | 'photos' | 'notes' | 'cv' | 'mail' | 'spotify' | 'about'
+export const windowIds = ['term', 'files', 'cv', 'mail', 'spotify'] as const
 export type WindowId = (typeof windowIds)[number]
 export type Folder = 'projects' | 'photos' | 'notes'
 
@@ -15,6 +15,7 @@ export const apps: Record<
   notes: { label: 'Notes', window: 'Files', file: 'notes/', glyph: '✎', bg: '#463f21', fg: '#efab30', border: '#efab30', slug: 'notes' },
   cv: { label: 'CV', window: 'Document Viewer', file: 'cv.pdf', glyph: 'CV', bg: '#f1ede4', fg: '#0d1b1c', border: '#f1ede4', slug: 'cv' },
   mail: { label: 'Mail', window: 'Mail', file: 'contact', glyph: '@', bg: '#476762', fg: '#f1ede4', border: '#476762', slug: 'mail' },
+  spotify: { label: 'Spotify', window: 'Spotify', file: 'spotify', glyph: '♫', bg: '#1db954', fg: '#0d1b1c', border: '#1db954', slug: 'spotify' },
   about: { label: 'About', window: 'About', file: 'about', glyph: 'i', bg: '#0d1b1c', fg: '#f1ede4', border: '#f1ede4', slug: 'about' },
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { bootLog, profile } from '#/data/portfolio'
 import { appFolder, apps, folderApp, formatClock, windowIds } from '#/lib/os'
@@ -9,6 +9,8 @@ import { ContextMenu } from './ContextMenu'
 import type { MenuItem, MenuState } from './ContextMenu'
 import { FilesWindow } from './Files'
 import { CvPaper, HudCorners, LogoBox, MailSent, ProgressBar, Wordmark, useMailto } from './shared'
+import { SpotifyPlayer } from './Spotify'
+import { toast } from './Toaster'
 import { TerminalBody } from './Terminal'
 
 const BAR = 34
@@ -18,22 +20,32 @@ const DEF: Record<WindowId, { x: number; y: number; w: number; h: number }> = {
   files: { x: 130, y: 62, w: 920, h: 560 },
   cv: { x: 340, y: 48, w: 620, h: 700 },
   mail: { x: 420, y: 130, w: 540, h: 460 },
+  spotify: { x: 480, y: 170, w: 600, h: 300 },
 }
-const WINDOW_NAME: Record<WindowId, string> = { term: 'Terminal', files: 'Files', cv: 'Document Viewer', mail: 'Mail' }
-const WINDOW_SLUG: Record<WindowId, string> = { term: 'terminal', files: 'files', cv: 'cv', mail: 'mail' }
+const WINDOW_NAME: Record<WindowId, string> = { term: 'Terminal', files: 'Files', cv: 'Document Viewer', mail: 'Mail', spotify: 'Spotify' }
+const WINDOW_SLUG: Record<WindowId, string> = { term: 'terminal', files: 'files', cv: 'cv', mail: 'mail', spotify: 'spotify' }
 
 // Desktop icons, dock and app menu, in this order.
-const launchers: AppId[] = ['term', 'work', 'photos', 'notes', 'cv', 'mail']
+const launchers: AppId[] = ['term', 'work', 'photos', 'notes', 'cv', 'mail', 'spotify']
 
 type Win = { open: boolean; min: boolean; max: boolean; pos: { x: number; y: number } | null; z: number }
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 // ---- desktop icon positions: snapped to the 80px wallpaper grid, kept in localStorage until a reboot or refresh.
+// The grid sits inside the orange corner brackets and above the dock.
 
 const CELL = 80
-const ICONS_KEY = 'popos-icons'
+const GRID_X = 24
+const GRID_Y = 88
+const GRID_BOTTOM = 84
+const ICONS_KEY = 'popos-icons-v2'
 type Cell = { c: number; r: number }
-const defaultCells = (): Record<string, Cell> => Object.fromEntries(launchers.map((id, i) => [id, { c: 0, r: i + 1 }]))
+const gridSize = ({ W, H }: { W: number; H: number }) => ({
+  cols: Math.max(1, Math.floor((W - 2 * GRID_X) / CELL)),
+  rows: Math.max(1, Math.floor((H - GRID_Y - GRID_BOTTOM) / CELL)),
+})
+const cellKey = (p: Cell) => `${p.c},${p.r}`
+const defaultCells = (): Record<string, Cell> => Object.fromEntries(launchers.map((id, i) => [id, { c: 0, r: i }]))
 function loadCells(): Record<string, Cell> {
   try {
     const saved = JSON.parse(localStorage.getItem(ICONS_KEY) ?? 'null') as Record<string, Cell> | null
@@ -51,6 +63,29 @@ function saveCells(cells: Record<string, Cell> | null) {
     // Storage blocked: positions just don't persist.
   }
 }
+function nearestFree(want: Cell, taken: Set<string>, cols: number, rows: number): Cell {
+  let best = want
+  let bestD = Infinity
+  for (let c = 0; c < cols; c++)
+    for (let r = 0; r < rows; r++) {
+      const d = (c - want.c) ** 2 + (r - want.r) ** 2
+      if (d < bestD && !taken.has(`${c},${r}`)) [best, bestD] = [{ c, r }, d]
+    }
+  return best
+}
+// Where each icon actually goes on this screen: inside the grid, one icon per cell.
+function layoutCells(cells: Record<string, Cell>, cols: number, rows: number) {
+  const taken = new Set<string>()
+  const out: Record<string, Cell> = {}
+  for (const id of launchers) {
+    const want = { c: clamp(cells[id].c, 0, cols - 1), r: clamp(cells[id].r, 0, rows - 1) }
+    const at = taken.has(cellKey(want)) ? nearestFree(want, taken, cols, rows) : want
+    taken.add(cellKey(at))
+    out[id] = at
+  }
+  return out
+}
+const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))
 
 export function Desktop({
   enabled,
@@ -164,7 +199,8 @@ export function Desktop({
         <div className="flex flex-col gap-1 text-xs leading-[1.5]">
           <span className="font-sans text-[15px] font-bold">Welcome, guest</span>
           <span className="text-muted">
-            Type <span className="text-amber">help</span> in the terminal, open an app from the dock, or right-click the desktop. Icons and windows drag.
+            Open an app from the desktop or the dock, or open the terminal and type <span className="text-amber">help</span>. Drag across the desktop to select icons;
+            right-click for more.
           </span>
         </div>
         <button type="button" aria-label="Dismiss" onClick={() => setToast(false)} className="cursor-pointer self-start border-0 bg-transparent text-sm text-paper">
@@ -251,13 +287,13 @@ function Session({
 
   // ---- windows
   const [wins, setWins] = useState<Record<WindowId, Win>>(() =>
-    Object.fromEntries(windowIds.map((id) => [id, { open: id === 'term', min: false, max: false, pos: null, z: id === 'term' ? 2 : 1 }])) as Record<
+    Object.fromEntries(windowIds.map((id) => [id, { open: false, min: false, max: false, pos: null, z: 1 }])) as Record<
       WindowId,
       Win
     >,
   )
   const zRef = useRef(2)
-  const [active, setActive] = useState<WindowId | null>('term')
+  const [active, setActive] = useState<WindowId | null>(null)
   const [folder, setFolder] = useState<Folder>('projects')
   const [menu, setMenu] = useState(false)
   const [ctx, setCtx] = useState<MenuState>(null)
@@ -308,7 +344,14 @@ function Session({
     patch(id, { min: true })
     setActive(null)
   }
+  // Full screen on and off glides between the two sizes.
+  const [resizing, setResizing] = useState<WindowId | null>(null)
+  const resizeTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(resizeTimer.current), [])
   const maxWin = (id: WindowId) => {
+    setResizing(id)
+    clearTimeout(resizeTimer.current)
+    resizeTimer.current = setTimeout(() => setResizing(null), 340)
     setWins((w) => ({ ...w, [id]: { ...w[id], max: !w[id].max } }))
     focusWin(id)
   }
@@ -375,23 +418,143 @@ function Session({
     if (initialApp) openApp(initialApp)
   }, [enabled, initialApp, openApp])
 
-  // ---- icons
+  // ---- icons: click opens, drag moves, drag across the wallpaper selects several.
+  const { cols, rows } = gridSize(size)
   const [cells, setCells] = useState<Record<string, Cell>>(defaultCells)
   useEffect(() => setCells(loadCells()), [])
+  const placed = useMemo(() => layoutCells(cells, cols, rows), [cells, cols, rows])
+  const [selected, setSelected] = useState<Set<AppId>>(() => new Set())
+  const [iconDrag, setIconDrag] = useState<{ ids: AppId[]; dx: number; dy: number } | null>(null)
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
+
   const resetIcons = useCallback(() => {
     saveCells(null)
     setCells(defaultCells())
+    setSelected(new Set())
+    toast.success('Icons back in place')
   }, [])
-  const moveIcon = (id: AppId, to: Cell) => {
-    setCells((cur) => {
-      const next = { ...cur }
-      const other = launchers.find((o) => o !== id && cur[o].c === to.c && cur[o].r === to.r)
-      if (other) next[other] = cur[id]
-      next[id] = to
-      saveCells(next)
-      return next
-    })
+
+  const moveIcons = (ids: AppId[], dx: number, dy: number) => {
+    const dc = Math.round(dx / CELL)
+    const dr = Math.round(dy / CELL)
+    if (!dc && !dr) return
+    const next = { ...placed }
+    const target = (id: AppId) => ({ c: clamp(placed[id].c + dc, 0, cols - 1), r: clamp(placed[id].r + dr, 0, rows - 1) })
+    if (ids.length === 1) {
+      // One icon swaps places with whatever it is dropped on.
+      const to = target(ids[0])
+      const other = launchers.find((o) => o !== ids[0] && placed[o].c === to.c && placed[o].r === to.r)
+      if (other) next[other] = placed[ids[0]]
+      next[ids[0]] = to
+    } else {
+      // A group keeps its shape; an icon whose spot is taken or off screen takes the nearest free cell.
+      const taken = new Set(launchers.filter((o) => !ids.includes(o)).map((o) => cellKey(placed[o])))
+      for (const id of ids) {
+        const want = target(id)
+        const at = taken.has(cellKey(want)) ? nearestFree(want, taken, cols, rows) : want
+        taken.add(cellKey(at))
+        next[id] = at
+      }
+      toast.success(`Moved ${ids.length} icons`)
+    }
+    setCells(next)
+    saveCells(next)
   }
+
+  const endIconDrag = useRef<(() => void) | null>(null)
+  useEffect(() => () => endIconDrag.current?.(), [])
+  const startIconDrag = (id: AppId, e: ReactPointerEvent) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    setMenu(false)
+    const toggle = e.shiftKey || e.ctrlKey || e.metaKey
+    const group = selected.has(id) && !toggle ? launchers.filter((o) => selected.has(o)) : [id]
+    const sx = e.clientX
+    const sy = e.clientY
+    let moved = false
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - sx
+      const dy = ev.clientY - sy
+      if (!moved && Math.hypot(dx, dy) < 5) return
+      if (!moved && !selected.has(id)) setSelected(new Set([id]))
+      moved = true
+      setIconDrag({ ids: group, dx, dy })
+    }
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      endIconDrag.current = null
+      setIconDrag(null)
+      if (moved) return moveIcons(group, ev.clientX - sx, ev.clientY - sy)
+      if (toggle)
+        setSelected((cur) => {
+          const next = new Set(cur)
+          if (!next.delete(id)) next.add(id)
+          return next
+        })
+      else {
+        setSelected(new Set([id]))
+        openApp(id)
+      }
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    endIconDrag.current = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+  }
+
+  const startMarquee = (e: ReactPointerEvent) => {
+    setMenu(false)
+    if (e.button !== 0) return
+    const additive = e.shiftKey || e.ctrlKey || e.metaKey
+    const base = additive ? new Set(selected) : new Set<AppId>()
+    setSelected(base)
+    const x0 = e.clientX
+    const y0 = e.clientY
+    const move = (ev: PointerEvent) => {
+      const [x1, y1] = [ev.clientX, ev.clientY]
+      if (Math.hypot(x1 - x0, y1 - y0) < 4) return
+      setMarquee({ x0, y0, x1, y1 })
+      const [L, R, T, B] = [Math.min(x0, x1), Math.max(x0, x1), Math.min(y0, y1), Math.max(y0, y1)]
+      const next = new Set(base)
+      for (const id of launchers) {
+        const x = GRID_X + placed[id].c * CELL
+        const y = GRID_Y + placed[id].r * CELL
+        if (x < R && x + CELL > L && y < B && y + CELL > T) next.add(id)
+      }
+      setSelected(next)
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      endIconDrag.current = null
+      setMarquee(null)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    endIconDrag.current = up
+  }
+
+  // Keys for selected icons when no window has focus: Escape, Ctrl+A, and Delete (which isn't allowed).
+  useEffect(() => {
+    if (!enabled) return
+    const key = (e: KeyboardEvent) => {
+      if (activeRef.current || isTyping(e.target) || document.querySelector('[role=menu]')) return
+      if (e.key === 'Escape') setSelected(new Set())
+      else if (e.key.toLowerCase() === 'a' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
+        setSelected(new Set(launchers))
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && selected.size) {
+        e.preventDefault()
+        toast.error(selected.size > 1 ? "Desktop icons can't be deleted" : `${apps[[...selected][0]].file} is a system icon and can't be deleted`)
+      }
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [enabled, selected])
 
   const closeTerm = useCallback(() => closeWin('term'), [closeWin])
   const term = useTerminal({ onOpen: openApp, onReboot, onExit: closeTerm })
@@ -405,7 +568,8 @@ function Session({
     e.preventDefault()
     openMenu(e, [
       { label: '⟳ Refresh  (reset icons)', onSelect: resetIcons },
-      { label: '+ New note', disabled: true, hint: 'only in ~/notes' },
+      { label: '+ New note', disabled: true, hint: 'only in ~/notes', reason: 'New notes can only be made inside ~/notes' },
+      { label: 'Select all', onSelect: () => setSelected(new Set(launchers)) },
       'sep',
       { label: 'Open terminal', onSelect: () => openWin('term') },
       { label: 'Open files', onSelect: () => openApp('work') },
@@ -427,6 +591,7 @@ function Session({
         g={geom(id)}
         z={w.max ? w.z + 100 : w.z}
         visible={visible}
+        resizing={resizing === id}
         focused={active === id}
         onFocus={() => focusWin(id)}
         onDrag={(e) => startDrag(id, e)}
@@ -442,7 +607,7 @@ function Session({
   return (
     <>
       {/* Wallpaper */}
-      <div onPointerDown={() => menu && setMenu(false)} onContextMenu={desktopMenu} className="desk-grid absolute inset-0">
+      <div onPointerDown={startMarquee} onContextMenu={desktopMenu} className="desk-grid absolute inset-0">
         <div aria-hidden className="absolute top-16 right-12 text-right text-[13px] leading-[1.7] font-medium text-amber">
           // developer + photographer
           <br />
@@ -470,20 +635,44 @@ function Session({
           <DesktopIcon
             key={id}
             id={id}
-            cell={cells[id]}
-            size={size}
+            at={placed[id]}
+            selected={selected.has(id)}
+            drag={iconDrag?.ids.includes(id) ? iconDrag : null}
+            onPointerDown={(e) => startIconDrag(id, e)}
             onOpen={() => openApp(id)}
-            onMove={(to) => moveIcon(id, to)}
-            onMenu={(e) =>
+            onMenu={(e) => {
+              const group = selected.has(id) ? launchers.filter((o) => selected.has(o)) : [id]
+              if (!selected.has(id)) setSelected(new Set([id]))
               openMenu(e, [
-                { label: `Open ${apps[id].file}`, onSelect: () => openApp(id) },
+                group.length > 1
+                  ? { label: `Open ${group.length} apps`, onSelect: () => group.forEach(openApp) }
+                  : { label: `Open ${apps[id].file}`, onSelect: () => openApp(id) },
+                {
+                  label: 'Delete',
+                  disabled: true,
+                  hint: 'system icon',
+                  reason: group.length > 1 ? "Desktop icons can't be deleted" : `${apps[id].file} is a system icon and can't be deleted`,
+                  danger: true,
+                },
                 'sep',
                 { label: '⟳ Refresh  (reset icons)', onSelect: resetIcons },
               ])
-            }
+            }}
           />
         ))}
       </nav>
+      {marquee && (
+        <div
+          aria-hidden
+          className="marquee pointer-events-none absolute z-[2]"
+          style={{
+            left: Math.min(marquee.x0, marquee.x1),
+            top: Math.min(marquee.y0, marquee.y1),
+            width: Math.abs(marquee.x1 - marquee.x0),
+            height: Math.abs(marquee.y1 - marquee.y0),
+          }}
+        />
+      )}
 
       {win(
         'term',
@@ -495,7 +684,7 @@ function Session({
       {win('files', `Files — ~/${folder}`, <FilesWindow folder={folder} setFolder={setFolder} openWin={openWin} openMenu={openMenu} />)}
       {win(
         'cv',
-        'PetarPopovic_CV.pdf',
+        'petar-popovic-cv-en.pdf',
         <>
           <div className="flex h-[42px] flex-none items-center gap-3.5 border-b border-deep px-3 text-[11px] text-dim">
             <span>page 1 / 1</span>
@@ -510,6 +699,7 @@ function Session({
         </>,
       )}
       {win('mail', 'Mail — new message', <MailApp />)}
+      {win('spotify', 'Spotify — now playing', <SpotifyPlayer active={wins.spotify.open && !wins.spotify.min && ready} />)}
 
       {/* Top bar */}
       <header className="absolute inset-x-0 top-0 z-[900] flex h-[34px] items-center gap-4 border-b border-deep bg-ink/92 pr-3.5 pl-1.5 text-xs font-medium">
@@ -603,58 +793,28 @@ function Session({
   )
 }
 
-// A desktop icon: click opens, drag moves it to another grid cell.
+// A desktop icon on the grid. The session handles clicks, drags and selection.
 function DesktopIcon({
   id,
-  cell,
-  size,
+  at,
+  selected,
+  drag,
+  onPointerDown,
   onOpen,
-  onMove,
   onMenu,
 }: {
   id: AppId
-  cell: Cell
-  size: { W: number; H: number }
+  at: Cell
+  selected: boolean
+  drag: { dx: number; dy: number } | null
+  onPointerDown: (e: ReactPointerEvent) => void
   onOpen: () => void
-  onMove: (to: Cell) => void
   onMenu: (e: ReactMouseEvent) => void
 }) {
-  const [drag, setDrag] = useState<{ dx: number; dy: number } | null>(null)
-  const moved = useRef(false)
-  const maxC = Math.max(0, Math.floor(size.W / CELL) - 1)
-  const maxR = Math.max(1, Math.floor((size.H - 90) / CELL) - 1)
-  const c = clamp(cell.c, 0, maxC)
-  const r = clamp(cell.r, 1, maxR)
-
-  const onPointerDown = (e: ReactPointerEvent<HTMLAnchorElement>) => {
-    if (e.button !== 0) return
-    e.preventDefault()
-    const sx = e.clientX
-    const sy = e.clientY
-    moved.current = false
-    const move = (ev: PointerEvent) => {
-      const dx = ev.clientX - sx
-      const dy = ev.clientY - sy
-      if (!moved.current && Math.hypot(dx, dy) < 5) return
-      moved.current = true
-      setDrag({ dx, dy })
-    }
-    const up = (ev: PointerEvent) => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-      setDrag(null)
-      if (!moved.current) return onOpen()
-      const nc = clamp(Math.round((c * CELL + ev.clientX - sx) / CELL), 0, maxC)
-      const nr = clamp(Math.round((r * CELL + ev.clientY - sy) / CELL), 1, maxR)
-      if (nc !== c || nr !== r) onMove({ c: nc, r: nr })
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-  }
-
   return (
     <a
       href={`/?app=${apps[id].slug}`}
+      aria-current={selected || undefined}
       onPointerDown={onPointerDown}
       onClick={(e) => {
         e.preventDefault()
@@ -667,11 +827,13 @@ function DesktopIcon({
         onMenu(e)
       }}
       draggable={false}
-      className={`pointer-events-auto absolute flex size-20 touch-none flex-col items-center justify-center gap-1.5 border text-paper no-underline ${drag ? 'z-10 cursor-grabbing border-amber bg-deep/70 opacity-90' : 'border-transparent hover:border-teal hover:bg-deep/60'}`}
-      style={{ left: c * CELL, top: r * CELL, transform: drag ? `translate(${drag.dx}px, ${drag.dy}px)` : undefined }}
+      className={`pointer-events-auto absolute flex size-20 touch-none flex-col items-center justify-center gap-1.5 border text-paper no-underline ${
+        drag ? 'z-10 cursor-grabbing border-amber bg-deep/70 opacity-90' : selected ? 'border-amber bg-amber/15' : 'border-transparent hover:border-teal hover:bg-deep/60'
+      }`}
+      style={{ left: GRID_X + at.c * CELL, top: GRID_Y + at.r * CELL, transform: drag ? `translate(${drag.dx}px, ${drag.dy}px)` : undefined }}
     >
       <AppGlyph id={id} size={44} font={15} />
-      <span className="bg-ink px-1 py-px text-[11px] font-medium">{apps[id].file}</span>
+      <span className={`px-1 py-px text-[11px] font-medium ${selected ? 'bg-amber text-ink' : 'bg-ink'}`}>{apps[id].file}</span>
     </a>
   )
 }
@@ -695,6 +857,7 @@ function Window({
   g,
   z,
   visible,
+  resizing,
   focused,
   onFocus,
   onDrag,
@@ -708,6 +871,7 @@ function Window({
   g: { x: number; y: number; w: number; h: number }
   z: number
   visible: boolean
+  resizing: boolean
   focused: boolean
   onFocus: () => void
   onDrag: (e: ReactPointerEvent) => void
@@ -737,6 +901,9 @@ function Window({
         opacity: visible ? 1 : 0,
         transform: visible ? 'none' : 'scale(.94) translateY(18px)',
         pointerEvents: visible ? 'auto' : 'none',
+        transition: resizing
+          ? ['left', 'top', 'width', 'height'].map((p) => `${p} .32s cubic-bezier(.2,.8,.2,1)`).join(', ') + ', opacity .22s, transform .22s'
+          : undefined,
       }}
     >
       <div

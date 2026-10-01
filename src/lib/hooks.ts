@@ -4,6 +4,7 @@ import { profile } from '#/data/portfolio'
 import { complete, initialTerm, runCommand } from './terminal'
 import type { TermLine } from './terminal'
 import type { AppId } from './os'
+import { toast } from 'sonner'
 import { setAdminKey } from './useNotes'
 
 // Current time, ticking every 500ms. Null during SSR and the first render so
@@ -94,9 +95,13 @@ export function useTerminal({
           a.href = cv.href
           a.download = cv.file
           a.click()
+          toast.success(`Downloading ${cv.file}`)
         }
       }
-      if (fx.admin !== undefined) setAdminKey(fx.admin)
+      if (fx.admin !== undefined) {
+        setAdminKey(fx.admin)
+        toast.success(fx.admin ? 'Admin key saved in this browser' : 'Admin key removed')
+      }
       if (fx.exit) onExit()
     },
     [cwd, onOpen, onReboot, onExit],

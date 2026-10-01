@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { profile } from '#/data/portfolio'
+import { toast } from './Toaster'
 
 // Every "Download CV" button opens one picker that asks for the language first.
 const CvPickerContext = createContext<() => void>(() => {})
@@ -42,7 +43,10 @@ export function CvPickerProvider({ children }: { children: ReactNode }) {
               key={cv.lang}
               href={cv.href}
               download={cv.file}
-              onClick={close}
+              onClick={() => {
+                close()
+                toast.success(`Downloading ${cv.file}`)
+              }}
               className="group flex items-center justify-between gap-4 px-3 py-3.5 text-paper no-underline hover:bg-deep"
             >
               <span className="flex items-baseline gap-3.5">
