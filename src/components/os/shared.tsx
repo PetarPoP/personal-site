@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { certificates, education, experience, languages, otherWork, profile, skills } from '#/data/portfolio'
+import { sendMail } from '#/lib/mail'
 import { stripes } from '#/lib/os'
+import { toast } from './Toaster'
 
 // A photo or screenshot: the real image when there is one, the striped placeholder otherwise.
 export function Shot({
@@ -211,38 +213,29 @@ export function CvPaper({ compact = false }: { compact?: boolean }) {
 
 // ---- Mail -------------------------------------------------------------------
 
-// There is no mail backend: sending opens the visitor's mail app with the
-// message filled in.
-export function useMailto() {
-  const [sent, setSent] = useState(false)
-  const send = (form: HTMLFormElement) => {
-    const data = new FormData(form)
-    const from = String(data.get('from') ?? '').trim()
-    const subject = String(data.get('subject') ?? '').trim() || 'Hello from your website'
-    const message = String(data.get('message') ?? '').trim()
-    const body = from ? `${message}\n\n— ${from}` : message
-    window.location.href = `mailto:${profile.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-    setSent(true)
+// Sends the Mail form through the server and confirms with a toast.
+export function useMail() {
+  const [sending, setSending] = useState(false)
+  const send = async (form: HTMLFormElement) => {
+    if (sending) return
+    const data = Object.fromEntries(new FormData(form)) as Record<string, string>
+    setSending(true)
+    try {
+      const res = await sendMail({ data })
+      if (res.ok) {
+        toast.success('Message sent', { description: `Petar will reply to ${data.from}.` })
+        form.reset()
+      } else toast.error(res.error)
+    } catch {
+      toast.error(`Couldn't send right now. Write to ${profile.email} directly.`)
+    } finally {
+      setSending(false)
+    }
   }
-  return { sent, send, reset: () => setSent(false) }
+  return { sending, send }
 }
 
-export function MailSent({ onReset, big }: { onReset: () => void; big: number }) {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-      <span className="font-sans font-extrabold text-amber" style={{ fontSize: big }}>
-        Sent ✓
-      </span>
-      <span className="max-w-[320px] text-xs leading-[1.6] text-muted">
-        Your mail app has the message ready. You can also write to {profile.email} directly.
-      </span>
-      <button
-        type="button"
-        onClick={onReset}
-        className="mt-2 h-10 cursor-pointer border border-teal bg-transparent px-3.5 font-mono text-[11px] font-medium text-paper hover:border-amber"
-      >
-        New message
-      </button>
-    </div>
-  )
+// Hidden from people; bots that fill every field get ignored by the server.
+export function Honeypot() {
+  return <input name="website" tabIndex={-1} autoComplete="off" aria-hidden className="absolute -left-[9999px] size-px opacity-0" />
 }

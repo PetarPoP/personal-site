@@ -33,7 +33,7 @@ npm run build    # production build (SSR)
 
 Deep links: `/?app=projects|photos|notes|cv|mail|spotify|about` opens that window/app directly and skips the boot.
 The boot plays once per browser session and is skipped with `prefers-reduced-motion`.
-The Mail app has no backend: "Send" opens the visitor's mail app with the message filled in.
+The Mail app sends through the server (see "Mail" below) and confirms with a toast.
 
 ## Guest notes
 
@@ -78,3 +78,16 @@ Without `IMMICH_SHARE_URL` the striped placeholders from `portfolio.ts` are show
 
 Note: in `npm run dev`, Vite answers image requests to `/api/photos/…` itself, so the photos only load in a build
 (`npm run build && node .output/server/index.mjs`).
+
+## Mail
+
+The Mail app sends the message to Petar with [Resend](https://resend.com); the visitor's address goes in Reply-To, so
+replying to the email answers them. Add in Vercel:
+
+- `RESEND_API_KEY` — from resend.com → API Keys
+- `MAIL_TO` (optional) — where messages go; defaults to the email in `portfolio.ts`
+- `MAIL_FROM` (optional) — defaults to `POP/OS <onboarding@resend.dev>`, which Resend only delivers to the email of the
+  Resend account itself. To send to any other address, verify a domain in Resend and set e.g. `POP/OS <mail@your-domain>`.
+
+Each visitor can send 5 messages an hour (counted in Upstash when it's connected). Without `RESEND_API_KEY`, `npm run dev`
+logs the message instead of sending it.

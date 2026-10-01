@@ -8,7 +8,7 @@ import { useCvPicker } from './CvPicker'
 import { ContextMenu } from './ContextMenu'
 import type { MenuItem, MenuState } from './ContextMenu'
 import { FilesWindow } from './Files'
-import { CvDocument, CvLangSwitch, HudCorners, LogoBox, MailSent, ProgressBar, Wordmark, useMailto } from './shared'
+import { CvDocument, CvLangSwitch, HudCorners, LogoBox, Honeypot, ProgressBar, Wordmark, useMail } from './shared'
 import type { CvLang } from './shared'
 import { SpotifyPlayer } from './Spotify'
 import { toast } from './Toaster'
@@ -1084,25 +1084,25 @@ function Window({
 }
 
 function MailApp() {
-  const mail = useMailto()
-  if (mail.sent) return <MailSent onReset={mail.reset} big={44} />
+  const mail = useMail()
   const row = 'flex gap-2.5 border-b border-deep px-3.5 py-2.5'
   const input = 'flex-1 border-0 bg-transparent font-mono text-xs text-paper caret-amber outline-none focus-visible:outline-none'
   return (
     <form
-      className="flex flex-1 flex-col text-xs select-text"
+      className="relative flex flex-1 flex-col text-xs select-text"
       onSubmit={(e) => {
         e.preventDefault()
-        mail.send(e.currentTarget)
+        void mail.send(e.currentTarget)
       }}
     >
+      <Honeypot />
       <div className={row}>
         <span className="w-[60px] text-dim">To</span>
         <span className="text-amber">{profile.email}</span>
       </div>
       <label className={row}>
         <span className="w-[60px] text-dim">From</span>
-        <input name="from" type="email" placeholder="you@email.com" className={input} />
+        <input name="from" type="email" required placeholder="you@email.com" className={input} />
       </label>
       <label className={row}>
         <span className="w-[60px] text-dim">Subject</span>
@@ -1117,8 +1117,12 @@ function MailApp() {
       />
       <div className="flex items-center gap-2.5 border-t border-deep px-3.5 py-2.5">
         <span className="text-dim">replies within a day or two</span>
-        <button type="submit" className="ml-auto cursor-pointer border-0 bg-amber px-[18px] py-[9px] font-mono text-xs font-bold text-ink hover:bg-signal">
-          Send ⏎
+        <button
+          type="submit"
+          disabled={mail.sending}
+          className="ml-auto cursor-pointer border-0 bg-amber px-[18px] py-[9px] font-mono text-xs font-bold text-ink hover:bg-signal disabled:cursor-wait disabled:opacity-70"
+        >
+          {mail.sending ? 'Sending…' : 'Send ⏎'}
         </button>
       </div>
     </form>

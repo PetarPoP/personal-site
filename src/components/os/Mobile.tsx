@@ -5,7 +5,7 @@ import { appFromSlug, apps, formatClock, stripes } from '#/lib/os'
 import type { AppId } from '#/lib/os'
 import { blinkOn, markBooted, shouldSkipBoot, useNow, useTerminal } from '#/lib/hooks'
 import { useCvPicker } from './CvPicker'
-import { CvDocument, CvLangSwitch, HudCorners, LogoBox, MailSent, ProgressBar, Shot, Wordmark, useMailto } from './shared'
+import { CvDocument, CvLangSwitch, HudCorners, LogoBox, Honeypot, ProgressBar, Shot, Wordmark, useMail } from './shared'
 import type { CvLang } from './shared'
 import { SpotifyPlayer } from './Spotify'
 import { toast } from './Toaster'
@@ -497,31 +497,35 @@ function PhotosApp() {
 }
 
 function MailApp() {
-  const mail = useMailto()
-  if (mail.sent) return <MailSent onReset={mail.reset} big={46} />
+  const mail = useMail()
   const field = 'border border-teal bg-ink font-[inherit] text-paper outline-none focus:border-amber focus-visible:outline-none'
   return (
     <form
-      className="flex flex-col gap-3 p-4 text-xs select-text"
+      className="relative flex flex-col gap-3 p-4 text-xs select-text"
       onSubmit={(e) => {
         e.preventDefault()
-        mail.send(e.currentTarget)
+        void mail.send(e.currentTarget)
       }}
     >
+      <Honeypot />
       <div className="flex flex-col gap-1.5">
         <span className="text-dim">TO</span>
         <span className="text-[13px] text-amber">{profile.email}</span>
       </div>
       <label className="flex flex-col gap-1.5">
         <span className="text-dim">FROM</span>
-        <input name="from" type="email" placeholder="you@email.com" className={`h-[46px] px-3 font-mono text-sm ${field}`} />
+        <input name="from" type="email" required placeholder="you@email.com" className={`h-[46px] px-3 font-mono text-sm ${field}`} />
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="text-dim">MESSAGE</span>
         <textarea name="message" required placeholder="Hi Petar, …" className={`h-[200px] resize-none p-3 font-sans text-[15px] leading-[1.5] ${field}`} />
       </label>
-      <button type="submit" className="h-[52px] cursor-pointer border-0 bg-amber font-mono text-sm font-bold text-ink active:bg-signal">
-        Send ⏎
+      <button
+        type="submit"
+        disabled={mail.sending}
+        className="h-[52px] cursor-pointer border-0 bg-amber font-mono text-sm font-bold text-ink active:bg-signal disabled:cursor-wait disabled:opacity-70"
+      >
+        {mail.sending ? 'Sending…' : 'Send ⏎'}
       </button>
     </form>
   )
