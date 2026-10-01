@@ -15,6 +15,24 @@ export type Track = {
 export type NowPlaying =
   | { configured: false }
   | { configured: true; playing: boolean; track: Track | null; progressMs: number; playedAt: number | null }
+  | { configured: true; error: string }
+
+// A Spotify answer we can explain to the site owner (shown in the app and in the server log).
+class SpotifyError extends Error {}
+
+// Values pasted into the Vercel dashboard sometimes keep quotes or spaces.
+const env = (name: string) => process.env[name]?.trim().replace(/^(['"])(.*)\1$/, '$2').trim() || undefined
+
+async function failure(res: Response, what: string) {
+  let detail = ''
+  try {
+    const body = (await res.json()) as { error?: string | { message?: string }; error_description?: string }
+    detail = typeof body.error === 'string' ? `${body.error}${body.error_description ? `: ${body.error_description}` : ''}` : (body.error?.message ?? '')
+  } catch {
+    // Not JSON.
+  }
+  return `${what} (${res.status}${detail ? `, ${detail}` : ''})`
+}
 
 let token: { value: string; expires: number } | null = null
 let cached: { at: number; data: NowPlaying } | null = null
@@ -46,21 +64,30 @@ async function accessToken(id: string, secret: string, refresh: string) {
   const res = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: {
-      Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}`,
+      Authorization: `Basic ${btoa(`${id}:${secret}`)}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refresh }),
   })
-  if (!res.ok) throw new Error(`Spotify token request failed: ${res.status}`)
+  if (!res.ok) {
+    const why = await failure(res, 'Spotify refused the login')
+    throw new SpotifyError(
+      res.status === 400 && why.includes('invalid_client')
+        ? `${why}. Check SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET.`
+        : res.status === 400
+          ? `${why}. SPOTIFY_REFRESH_TOKEN must come from the same Spotify app as the client ID.`
+          : why,
+    )
+  }
   const json = (await res.json()) as { access_token: string; expires_in: number }
   token = { value: json.access_token, expires: Date.now() + json.expires_in * 1000 }
   return token.value
 }
 
 async function fetchNowPlaying(): Promise<NowPlaying> {
-  const id = process.env.SPOTIFY_CLIENT_ID
-  const secret = process.env.SPOTIFY_CLIENT_SECRET
-  const refresh = process.env.SPOTIFY_REFRESH_TOKEN
+  const id = env('SPOTIFY_CLIENT_ID')
+  const secret = env('SPOTIFY_CLIENT_SECRET')
+  const refresh = env('SPOTIFY_REFRESH_TOKEN')
   const now = Date.now()
 
   // Local development without credentials: a fixed song so the app can be worked on.
@@ -84,6 +111,8 @@ async function fetchNowPlaying(): Promise<NowPlaying> {
 
   const auth = { Authorization: `Bearer ${await accessToken(id, secret, refresh)}` }
   const current = await fetch('https://api.spotify.com/v1/me/player/currently-playing', { headers: auth })
+  if (current.status === 401 || current.status === 403)
+    throw new SpotifyError(`${await failure(current, 'Spotify blocked "currently playing"')}. The refresh token needs the user-read-currently-playing scope.`)
   if (current.status === 200) {
     const json = (await current.json()) as { is_playing: boolean; progress_ms: number | null; item: (SpotifyTrack & { type: string }) | null }
     if (json.item && json.item.type === 'track')
@@ -91,7 +120,9 @@ async function fetchNowPlaying(): Promise<NowPlaying> {
   }
 
   const recent = await fetch('https://api.spotify.com/v1/me/player/recently-played?limit=1', { headers: auth })
-  if (!recent.ok) throw new Error(`Spotify recently-played failed: ${recent.status}`)
+  if (recent.status === 401 || recent.status === 403)
+    throw new SpotifyError(`${await failure(recent, 'Spotify blocked "recently played"')}. The refresh token needs the user-read-recently-played scope.`)
+  if (!recent.ok) throw new SpotifyError(await failure(recent, 'Spotify "recently played" failed'))
   const json = (await recent.json()) as { items: { track: SpotifyTrack; played_at: string }[] }
   const last = json.items[0]
   return {
@@ -105,8 +136,17 @@ async function fetchNowPlaying(): Promise<NowPlaying> {
 
 export const getNowPlaying = createServerFn({ method: 'GET' }).handler(async (): Promise<NowPlaying> => {
   // Shared by every visitor, so Spotify is asked at most every 15 seconds per server instance.
-  if (!cached || Date.now() - cached.at >= CACHE_MS) cached = { at: Date.now(), data: await fetchNowPlaying() }
+  if (!cached || Date.now() - cached.at >= CACHE_MS) {
+    let data: NowPlaying
+    try {
+      data = await fetchNowPlaying()
+    } catch (e) {
+      console.error('[spotify]', e)
+      data = { configured: true, error: e instanceof SpotifyError ? e.message : `Couldn't reach Spotify (${e instanceof Error ? e.message : 'unknown error'})` }
+    }
+    cached = { at: Date.now(), data }
+  }
   const { data, at } = cached
   // Progress as of now, so the client can keep counting from the moment the answer arrives.
-  return data.configured && data.playing ? { ...data, progressMs: data.progressMs + Date.now() - at } : data
+  return data.configured && 'playing' in data && data.playing ? { ...data, progressMs: data.progressMs + Date.now() - at } : data
 })

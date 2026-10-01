@@ -56,11 +56,12 @@ function Equaliser() {
 export function SpotifyPlayer({ active, compact = false }: { active: boolean; compact?: boolean }) {
   const { data, error, reload } = useNowPlaying(active)
   const now = useNow() ?? 0
-  const track = data?.configured ? data.track : null
-  const playing = !!(data?.configured && data.playing && track)
+  const ok = data?.configured && 'track' in data ? data : null
+  const track = ok ? ok.track : null
+  const playing = !!(ok && ok.playing && track)
 
   // Reached the end of the song: ask again rather than wait for the next poll.
-  const progress = data?.configured && track ? Math.min(track.durationMs, data.progressMs + (playing ? now - data.fetchedAt : 0)) : 0
+  const progress = ok && track ? Math.min(track.durationMs, ok.progressMs + (playing ? now - ok.fetchedAt : 0)) : 0
   const lastReload = useRef(0)
   useEffect(() => {
     if (!playing || !track || progress < track.durationMs || Date.now() - lastReload.current < 8000) return
@@ -72,6 +73,13 @@ export function SpotifyPlayer({ active, compact = false }: { active: boolean; co
   if (!data && !error) return <p className={`m-0 text-xs text-dim ${pad}`}>tuning in…</p>
   if (error) return <p className={`m-0 text-xs text-signal ${pad}`}>Couldn't reach Spotify. Try again in a bit.</p>
   if (!data?.configured) return <p className={`m-0 text-xs text-dim ${pad}`}>Spotify isn't connected yet.</p>
+  if (!ok)
+    return (
+      <div className={`flex flex-col gap-2 text-xs ${pad}`}>
+        <p className="m-0 text-signal">Couldn't reach Spotify right now.</p>
+        {'error' in data && <p className="m-0 text-dim select-text">{data.error}</p>}
+      </div>
+    )
   if (!track) return <p className={`m-0 text-xs text-dim ${pad}`}>Nothing played lately.</p>
 
   return (
@@ -95,14 +103,14 @@ export function SpotifyPlayer({ active, compact = false }: { active: boolean; co
             </>
           ) : (
             <span className="text-dim">
-              {data.playedAt ? `LAST PLAYED · ${ago(data.playedAt, now || data.fetchedAt).toUpperCase()}` : 'PAUSED'}
+              {ok.playedAt ? `LAST PLAYED · ${ago(ok.playedAt, now || ok.fetchedAt).toUpperCase()}` : 'PAUSED'}
             </span>
           )}
         </div>
         <h3 className={`m-0 font-sans leading-[1.05] font-extrabold tracking-[-0.02em] break-words ${compact ? 'text-[28px]' : 'text-[26px]'}`}>{track.title}</h3>
         <p className="m-0 font-sans text-[15px] text-paper">{track.artists}</p>
         <p className="m-0 truncate text-[11px] text-dim">{track.album}</p>
-        {(playing || data.progressMs > 0) && (
+        {(playing || ok.progressMs > 0) && (
           <div className="mt-2 flex flex-col gap-1.5">
             <div className="h-1 bg-deep">
               <div className="h-full bg-amber" style={{ width: `${(progress / track.durationMs) * 100}%` }} />
