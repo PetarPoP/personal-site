@@ -155,3 +155,57 @@ export function useTerminal({
 }
 
 export type Terminal = ReturnType<typeof useTerminal>
+
+// ---- Phone back button ------------------------------------------------------
+
+// Overlays inside a phone app (the photo viewer) get their own history entry, so the phone's
+// back button closes them before it closes the app. Mobile's popstate handler asks
+// popBackLayer() first.
+const layers: { close: () => void; popped: boolean }[] = []
+let skipPops = 0
+
+export function useBackLayer(open: boolean, close: () => void) {
+  const closeRef = useRef(close)
+  closeRef.current = close
+  useEffect(() => {
+    if (!open) return
+    const layer = { close: () => closeRef.current(), popped: false }
+    window.history.pushState({ ...window.history.state, popLayer: true }, '')
+    layers.push(layer)
+    return () => {
+      const i = layers.indexOf(layer)
+      if (i >= 0) layers.splice(i, 1)
+      // Closed with a button: take its history entry away too.
+      if (!layer.popped) {
+        skipPops++
+        window.history.back()
+      }
+    }
+  }, [open])
+}
+
+// Handles a popstate for an open overlay. True when the app should ignore it.
+export function popBackLayer() {
+  if (skipPops > 0) {
+    skipPops--
+    return true
+  }
+  const top = layers.pop()
+  if (top) {
+    top.popped = true
+    top.close()
+    return true
+  }
+  // Forward onto an overlay's old entry: nothing to reopen.
+  return Boolean((window.history.state as { popLayer?: boolean } | null)?.popLayer)
+}
+
+// Closes every overlay without touching history; returns how many entries they held.
+export function dropBackLayers() {
+  const n = layers.length
+  for (const l of layers.splice(0)) {
+    l.popped = true
+    l.close()
+  }
+  return n
+}

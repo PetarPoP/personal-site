@@ -3,7 +3,7 @@ import { photoCategories, profile, projects, toneColor } from '#/data/portfolio'
 import type { PhotoCategory } from '#/data/portfolio'
 import type { Folder, WindowId } from '#/lib/os'
 import { useNotes } from '#/lib/useNotes'
-import { usePhotos } from '#/lib/usePhotos'
+import { usePhotos, usePreload } from '#/lib/usePhotos'
 import type { Frame } from '#/lib/usePhotos'
 import { useCvPicker } from './CvPicker'
 import { NotesFolder } from './Notes'
@@ -149,6 +149,7 @@ function PhotosFolder({
   const at = list.findIndex((p) => p.key === viewer)
   const step = (dir: number) => setViewer(list[(at + dir + list.length) % list.length].key)
   const cur = at >= 0 ? list[at] : null
+  usePreload(cur ? [list[(at + 1) % list.length]?.full, list[(at - 1 + list.length) % list.length]?.full] : [])
   // Real photos have no categories, so every one gets a size from its shape.
   const all = gallery.live || filter === 'All'
   return (
@@ -213,6 +214,7 @@ function PhotosFolder({
           <Shot
             key={cur.key}
             src={cur.full}
+            preview={cur.src !== cur.full ? cur.src : undefined}
             tone={cur.tone}
             alt={cur.caption}
             className="flex-1 items-center justify-center border border-teal"

@@ -72,8 +72,8 @@ Spotify is asked at most every 15 seconds per server instance. Locally, `SPOTIFY
 - `IMMICH_SHARE_URL` — the album's share link, e.g. `https://photos.example.com/share/<key>` (a `/s/<slug>` link works too)
 
 The server reads the album (at most every 5 minutes) and every image goes through `/api/photos/<id>`, so visitors never
-see the server's address or the share key, and the photos are never copied anywhere. Browsers cache each photo for an
-hour and Vercel's edge for a day. Captions come from the photo's description in Immich, else its city, else its date.
+see the server's address or the share key, and the photos are never copied anywhere. The grid uses Immich's small thumbnails and the viewer shows
+the thumbnail at once while the larger preview loads. Browsers cache each photo for a week and Vercel's edge for a month. Captions come from the photo's description in Immich, else its city, else its date.
 Without `IMMICH_SHARE_URL` the striped placeholders from `portfolio.ts` are shown.
 
 Note: in `npm run dev`, Vite answers image requests to `/api/photos/…` itself, so the photos only load in a build
