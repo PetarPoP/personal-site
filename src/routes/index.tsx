@@ -1,32 +1,63 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useScrollFx } from '#/lib/scroll-fx'
-import { Hud } from '#/components/Hud'
-import { Nav } from '#/components/Nav'
-import { Hero } from '#/components/Hero'
-import { Marquee } from '#/components/Marquee'
-import { About } from '#/components/About'
-import { Work } from '#/components/Work'
-import { Photos } from '#/components/Photos'
-import { Experience } from '#/components/Experience'
-import { Contact } from '#/components/Contact'
+import { useCallback } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Desktop } from "#/components/os/Desktop";
+import { Mobile } from "#/components/os/Mobile";
+import { CvPickerProvider } from "#/components/os/CvPicker";
+import { NotesProvider } from "#/lib/useNotes";
+import { appFromSlug, apps, appSlugs } from "#/lib/os";
+import type { AppId } from "#/lib/os";
+import { useMediaQuery } from "#/lib/hooks";
 
-export const Route = createFileRoute('/')({ component: Home })
+export const Route = createFileRoute("/")({
+  // ?app=projects|photos|notes|cv|mail|terminal|about opens that window or app.
+  validateSearch: (search: Record<string, unknown>): { app?: string } =>
+    typeof search.app === "string" && appSlugs.includes(search.app)
+      ? { app: search.app }
+      : {},
+  component: Home,
+});
 
 function Home() {
-  useScrollFx()
+  const { app } = Route.useSearch();
+  const initialApp = appFromSlug(app);
+  const navigate = useNavigate({ from: "/" });
+  // Desktop shell from 1024px up, phone shell below. Both render server-side;
+  // CSS shows the right one and only that one boots.
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+
+  const syncUrl = useCallback(
+    (id: AppId | null) => {
+      const slug = id && id !== "term" ? apps[id].slug : undefined;
+      navigate({
+        search: slug ? { app: slug } : {},
+        replace: true,
+        resetScroll: false,
+      });
+    },
+    [navigate],
+  );
+
   return (
-    <>
-      <Hud />
-      <Nav />
-      <main>
-        <Hero />
-        <Marquee />
-        <About />
-        <Work />
-        <Photos />
-        <Experience />
-      </main>
-      <Contact />
-    </>
-  )
+    <NotesProvider>
+      <CvPickerProvider>
+        <noscript>
+          <style>{"[data-boot]{display:none!important}"}</style>
+        </noscript>
+        <main className="max-lg:hidden">
+          <Desktop
+            enabled={isDesktop}
+            initialApp={initialApp}
+            onActiveChange={syncUrl}
+          />
+        </main>
+        <main className="lg:hidden">
+          <Mobile
+            enabled={isDesktop === null ? null : !isDesktop}
+            initialApp={initialApp}
+            onActiveChange={syncUrl}
+          />
+        </main>
+      </CvPickerProvider>
+    </NotesProvider>
+  );
 }
