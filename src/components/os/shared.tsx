@@ -79,6 +79,45 @@ export function ProgressBar({ width, value }: { width: number; value: number }) 
 
 // ---- CV document ------------------------------------------------------------
 
+// The CV exactly as the PDF looks (a rendered page), with the same text underneath for
+// screen readers and search engines.
+export type CvLang = 'EN' | 'HR'
+export function CvDocument({ lang }: { lang: CvLang }) {
+  const cv = profile.cvs.find((c) => c.lang === lang) ?? profile.cvs[0]
+  return (
+    <figure className="m-0">
+      <img
+        src={cv.href.replace(/\.pdf$/, '.png')}
+        width={1700}
+        height={2200}
+        alt={`${profile.name} — CV (${cv.label})`}
+        className="block h-auto w-full bg-white shadow-[0_10px_30px_rgba(0,0,0,.35)]"
+      />
+      <div className="sr-only">
+        <CvPaper />
+      </div>
+    </figure>
+  )
+}
+
+export function CvLangSwitch({ lang, setLang }: { lang: CvLang; setLang: (l: CvLang) => void }) {
+  return (
+    <div role="group" aria-label="CV language" className="flex">
+      {profile.cvs.map((c) => (
+        <button
+          key={c.lang}
+          type="button"
+          aria-pressed={c.lang === lang}
+          onClick={() => setLang(c.lang as CvLang)}
+          className={`cursor-pointer border px-2.5 py-[5px] font-mono text-[11px] font-bold ${c.lang === lang ? 'border-amber bg-amber text-ink' : 'border-teal bg-transparent text-paper hover:border-amber'}`}
+        >
+          {c.lang}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function CvHeading({ children }: { children: ReactNode }) {
   return <h3 className="m-0 border-b-2 border-ink pb-1 font-mono text-[11px] font-bold tracking-[0.1em] max-lg:text-[10px]">{children}</h3>
 }

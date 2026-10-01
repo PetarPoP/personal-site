@@ -5,7 +5,8 @@ import { apps, formatClock, stripes } from '#/lib/os'
 import type { AppId } from '#/lib/os'
 import { blinkOn, markBooted, shouldSkipBoot, useNow, useTerminal } from '#/lib/hooks'
 import { useCvPicker } from './CvPicker'
-import { CvPaper, HudCorners, LogoBox, MailSent, ProgressBar, Shot, Wordmark, useMailto } from './shared'
+import { CvDocument, CvLangSwitch, HudCorners, LogoBox, MailSent, ProgressBar, Shot, Wordmark, useMailto } from './shared'
+import type { CvLang } from './shared'
 import { SpotifyPlayer } from './Spotify'
 import { toast } from './Toaster'
 import { TerminalBody } from './Terminal'
@@ -39,6 +40,7 @@ export function Mobile({
   // Keep the app id while it slides down so its content doesn't vanish mid-animation.
   const [app, setApp] = useState<AppId>('work')
   const [appOpen, setAppOpen] = useState(false)
+  const [cvLang, setCvLang] = useState<CvLang>('EN')
   const timer = useRef<ReturnType<typeof setInterval>>(undefined)
 
   useEffect(() => {
@@ -202,7 +204,10 @@ export function Mobile({
           {app === 'photos' && <PhotosApp />}
           {app === 'cv' && (
             <div className="min-h-full bg-deep px-3.5 pt-3.5 pb-[100px]">
-              <CvPaper compact />
+              <div className="mb-3 flex justify-end">
+                <CvLangSwitch lang={cvLang} setLang={setCvLang} />
+              </div>
+              <CvDocument lang={cvLang} />
             </div>
           )}
           {app === 'mail' && <MailApp />}

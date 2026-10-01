@@ -147,8 +147,8 @@ export function SpotifyPlayer({ active, compact = false }: { active: boolean; co
             <rect x="14" y="5" width="4" height="14" rx="1" />
           </svg>
         ) : (
-          <svg aria-hidden viewBox="0 0 24 24" className="ml-1 size-7 fill-current">
-            <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z" />
+          <svg aria-hidden viewBox="0 0 24 24" className="size-7 fill-current">
+            <path transform="translate(-1.3 0)" d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z" />
           </svg>
         )}
       </a>
