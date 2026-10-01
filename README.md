@@ -51,7 +51,12 @@ and redeploy:
 
 - `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` — from the app at developer.spotify.com
 - `SPOTIFY_REFRESH_TOKEN` — a refresh token for your account with the `user-read-currently-playing` and
-  `user-read-recently-played` scopes
+  `user-read-recently-played` scopes. To get one, add `http://127.0.0.1:3000/callback` as a Redirect URI of the
+  Spotify app, run `SPOTIFY_CLIENT_ID=… SPOTIFY_CLIENT_SECRET=… npm run spotify-token`, open the printed link and
+  approve. The token is printed in the terminal.
+
+When Spotify hands out a newer refresh token, the site keeps it in Upstash, so the one in Vercel only needs replacing if
+Spotify says it was revoked (the Spotify app shows the reason).
 
 Spotify is asked at most every 15 seconds per server instance. Locally, `SPOTIFY_MOCK=1 npm run dev` shows a fixed song
 (`SPOTIFY_MOCK=recent` shows it as last played).
