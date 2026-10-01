@@ -47,7 +47,7 @@ function Equaliser() {
   return (
     <span aria-hidden className="flex h-3 items-end gap-[2px]">
       {[0, 0.25, 0.5, 0.15].map((d) => (
-        <span key={d} className="eq-bar w-[3px] bg-amber" style={{ height: '100%', animationDelay: `${-d}s` }} />
+        <span key={d} className="eq-bar w-[3px] bg-[#1ed760]" style={{ height: '100%', animationDelay: `${-d}s` }} />
       ))}
     </span>
   )
@@ -69,6 +69,8 @@ export function SpotifyPlayer({ active, compact = false }: { active: boolean; co
     void reload()
   }, [playing, track, progress, reload])
 
+  const tint = useCoverTint(track?.image ?? null)
+
   const pad = compact ? 'p-4' : 'p-5'
   if (!data && !error) return <p className={`m-0 text-xs text-dim ${pad}`}>tuning in…</p>
   if (error) return <p className={`m-0 text-xs text-signal ${pad}`}>Couldn't reach Spotify. Try again in a bit.</p>
@@ -82,54 +84,106 @@ export function SpotifyPlayer({ active, compact = false }: { active: boolean; co
     )
   if (!track) return <p className={`m-0 text-xs text-dim ${pad}`}>Nothing played lately.</p>
 
+  const pct = track.durationMs ? (progress / track.durationMs) * 100 : 0
+  const showProgress = playing || ok.progressMs > 0
   return (
-    <div className={`flex min-h-0 flex-1 gap-5 ${compact ? 'flex-col p-4' : 'items-center p-5'}`}>
+    // Laid out like Spotify's own now-playing screen, tinted with the cover's colour.
+    <div
+      className={`thin-scroll flex min-h-0 flex-1 flex-col overflow-auto font-sans text-white transition-[background] duration-700 ${compact ? 'min-h-full px-6 pt-5 pb-10' : 'px-6 pt-4 pb-6'}`}
+      style={{ background: `linear-gradient(180deg, ${tint} 0%, #121212 ${compact ? '85%' : '100%'})` }}
+    >
+      <div className="flex flex-col items-center text-center">
+        <span className="text-[12px] text-white/75">
+          {playing ? 'Playing from album' : ok.playedAt ? `Last played ${ago(ok.playedAt, now || ok.fetchedAt)}` : 'Paused'}
+        </span>
+        <span className="max-w-full truncate text-[14px] font-bold">{track.album}</span>
+      </div>
+
       <a
         href={track.url}
         target="_blank"
         rel="noreferrer"
         aria-label={`${track.title} on Spotify`}
-        className={`relative flex-none border border-teal ${compact ? 'aspect-square w-full' : 'size-[190px]'}`}
+        className={`mx-auto mt-5 block aspect-square w-full overflow-hidden rounded-md shadow-[0_8px_40px_rgba(0,0,0,.5)] ${compact ? '' : 'max-w-[320px]'}`}
         style={{ background: stripes('#1c3132') }}
       >
-        {track.image && <img src={track.image} alt={`${track.album} cover`} className="size-full object-cover" />}
+        {track.image && <img src={track.image} alt={`${track.album} cover`} crossOrigin="anonymous" className="size-full object-cover" />}
       </a>
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <div className="flex items-center gap-2 text-[11px] font-medium">
-          {playing ? (
-            <>
-              <Equaliser />
-              <span className="text-amber">NOW PLAYING</span>
-            </>
-          ) : (
-            <span className="text-dim">
-              {ok.playedAt ? `LAST PLAYED · ${ago(ok.playedAt, now || ok.fetchedAt).toUpperCase()}` : 'PAUSED'}
-            </span>
-          )}
+
+      <div className="mt-6 flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className={`m-0 truncate leading-tight font-bold tracking-[-0.01em] ${compact ? 'text-[24px]' : 'text-[22px]'}`} title={track.title}>
+            {track.title}
+          </h3>
+          <p className="m-0 mt-1 truncate text-[16px] text-white/70">{track.artists}</p>
         </div>
-        <h3 className={`m-0 font-sans leading-[1.05] font-extrabold tracking-[-0.02em] break-words ${compact ? 'text-[28px]' : 'text-[26px]'}`}>{track.title}</h3>
-        <p className="m-0 font-sans text-[15px] text-paper">{track.artists}</p>
-        <p className="m-0 truncate text-[11px] text-dim">{track.album}</p>
-        {(playing || ok.progressMs > 0) && (
-          <div className="mt-2 flex flex-col gap-1.5">
-            <div className="h-1 bg-deep">
-              <div className="h-full bg-amber" style={{ width: `${(progress / track.durationMs) * 100}%` }} />
-            </div>
-            <div className="flex justify-between text-[10px] text-dim">
-              <span>{mmss(progress)}</span>
-              <span>{mmss(track.durationMs)}</span>
-            </div>
-          </div>
-        )}
-        <a
-          href={track.url}
-          target="_blank"
-          rel="noreferrer"
-          className={`mt-2 self-start bg-amber px-3.5 py-2 text-xs font-bold text-ink no-underline hover:bg-signal ${compact ? 'w-full py-3.5 text-center text-[13px]' : ''}`}
-        >
-          Open in Spotify ↗
-        </a>
+        {playing && <Equaliser />}
       </div>
+
+      {showProgress && (
+        <div className="mt-5" role="progressbar" aria-label="Song progress" aria-valuemin={0} aria-valuemax={track.durationMs} aria-valuenow={progress}>
+          <div className="relative h-1 rounded-full bg-white/25">
+            <div className="h-full rounded-full bg-white" style={{ width: `${pct}%` }} />
+            <span className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" style={{ left: `${pct}%` }} />
+          </div>
+          <div className="mt-2 flex justify-between text-[12px] text-white/70 tabular-nums">
+            <span>{mmss(progress)}</span>
+            <span>{mmss(track.durationMs)}</span>
+          </div>
+        </div>
+      )}
+
+      <a
+        href={track.url}
+        target="_blank"
+        rel="noreferrer"
+        title="Open in Spotify"
+        aria-label={`${playing ? 'Playing' : 'Paused'}. Open in Spotify`}
+        className={`mx-auto flex size-16 flex-none items-center justify-center rounded-full bg-white text-[#121212] transition-transform hover:scale-105 ${showProgress ? 'mt-3' : 'mt-6'}`}
+      >
+        {playing ? (
+          <svg aria-hidden viewBox="0 0 24 24" className="size-7 fill-current">
+            <rect x="6" y="5" width="4" height="14" rx="1" />
+            <rect x="14" y="5" width="4" height="14" rx="1" />
+          </svg>
+        ) : (
+          <svg aria-hidden viewBox="0 0 24 24" className="ml-1 size-7 fill-current">
+            <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z" />
+          </svg>
+        )}
+      </a>
     </div>
   )
+}
+
+// The cover's average colour, darkened, for the background like Spotify does.
+const FALLBACK_TINT = '#2b3d3c'
+function useCoverTint(src: string | null) {
+  const [tint, setTint] = useState(FALLBACK_TINT)
+  useEffect(() => {
+    if (!src) return setTint(FALLBACK_TINT)
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas')
+        c.width = c.height = 16
+        const ctx = c.getContext('2d')
+        if (!ctx) return
+        ctx.drawImage(img, 0, 0, 16, 16)
+        const px = ctx.getImageData(0, 0, 16, 16).data
+        let [r, g, b] = [0, 0, 0]
+        for (let i = 0; i < px.length; i += 4) [r, g, b] = [r + px[i], g + px[i + 1], b + px[i + 2]]
+        const n = px.length / 4
+        const k = 0.55
+        setTint(`rgb(${Math.round((r / n) * k)}, ${Math.round((g / n) * k)}, ${Math.round((b / n) * k)})`)
+      } catch {
+        // The image host didn't allow reading pixels; keep the default colour.
+        setTint(FALLBACK_TINT)
+      }
+    }
+    img.onerror = () => setTint(FALLBACK_TINT)
+    img.src = src
+  }, [src])
+  return tint
 }

@@ -59,4 +59,4 @@ When Spotify hands out a newer refresh token, the site keeps it in Upstash, so t
 Spotify says it was revoked (the Spotify app shows the reason).
 
 Spotify is asked at most every 15 seconds per server instance. Locally, `SPOTIFY_MOCK=1 npm run dev` shows a fixed song
-(`SPOTIFY_MOCK=recent` shows it as last played).
+(`SPOTIFY_MOCK=recent` shows it as last played; `SPOTIFY_MOCK_IMAGE=<url>` adds a cover).
