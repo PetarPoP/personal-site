@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import type { PointerEvent } from 'react'
+import type { PointerEvent, ReactNode } from 'react'
 import { apps } from '#/lib/os'
 import type { AppId } from '#/lib/os'
 
-// The phone's recent apps, like Android's: cards side by side that scroll sideways. Tap a card
-// to open it, flick it up to close it, tap the dark space around to go back. The newest app is
-// on the right and in view when it opens; older ones are to the left.
+// The phone's recent apps, like Android's: a shrunk copy of each app's screen, side by side and
+// scrolling sideways. Tap a card to open it, flick it up to close it, tap the dark space around
+// to go back. The newest app is on the right and in view when it opens; older ones are to the left.
 export function Recents({
   open,
   list,
   subtitle,
+  preview,
   onPick,
   onRemove,
   onClear,
@@ -18,15 +19,21 @@ export function Recents({
   open: boolean
   list: AppId[]
   subtitle: Record<AppId, string>
-  onPick: (id: AppId) => void
+  preview: (id: AppId) => ReactNode
+  onPick: (id: AppId, from: DOMRect) => void
   onRemove: (id: AppId) => void
   onClear: () => void
   onClose: () => void
 }) {
   const strip = useRef<HTMLUListElement>(null)
+  // Cards keep the screen's shape, as big as fits between the title and the Clear all button.
+  const [screen, setScreen] = useState({ w: 390, h: 844 })
   useEffect(() => {
-    if (open && strip.current) strip.current.scrollLeft = strip.current.scrollWidth
+    if (!open) return
+    setScreen({ w: window.innerWidth, h: window.innerHeight })
+    if (strip.current) strip.current.scrollLeft = strip.current.scrollWidth
   }, [open])
+  const scale = Math.min(0.72, (screen.h - 250) / screen.h, 340 / screen.w)
   return (
     <div
       role="dialog"
@@ -34,7 +41,7 @@ export function Recents({
       aria-hidden={!open}
       inert={!open}
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      className="absolute inset-0 z-[55] flex flex-col bg-ink/80 backdrop-blur-sm transition-opacity duration-300"
+      className="absolute inset-0 z-[45] flex flex-col bg-ink/80 backdrop-blur-sm transition-opacity duration-300"
       style={{ opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none' }}
     >
       <div className="pointer-events-none mt-14 px-6 text-[11px] tracking-[0.1em] text-dim">RECENT</div>
@@ -45,7 +52,17 @@ export function Recents({
           className="m-0 flex flex-1 snap-x snap-mandatory list-none items-center gap-4 overflow-x-auto px-[14vw] py-6 [scrollbar-width:none]"
         >
           {[...list].reverse().map((id) => (
-            <Card key={id} id={id} subtitle={subtitle[id]} open={open} onPick={onPick} onRemove={onRemove} />
+            <Card
+              key={id}
+              id={id}
+              subtitle={subtitle[id]}
+              open={open}
+              screen={screen}
+              scale={scale}
+              preview={preview(id)}
+              onPick={onPick}
+              onRemove={onRemove}
+            />
           ))}
         </ul>
       ) : (
@@ -70,13 +87,19 @@ function Card({
   id,
   subtitle,
   open,
+  screen,
+  scale,
+  preview,
   onPick,
   onRemove,
 }: {
   id: AppId
   subtitle: string
   open: boolean
-  onPick: (id: AppId) => void
+  screen: { w: number; h: number }
+  scale: number
+  preview: ReactNode
+  onPick: (id: AppId, from: DOMRect) => void
   onRemove: (id: AppId) => void
 }) {
   const a = apps[id]
@@ -84,6 +107,7 @@ function Card({
   const [leaving, setLeaving] = useState(false)
   const drag = useRef<{ y: number; x: number; id: number; vertical: boolean | null } | null>(null)
   const moved = useRef(false)
+  const shot = useRef<HTMLSpanElement>(null)
 
   const down = (e: PointerEvent) => {
     drag.current = { x: e.clientX, y: e.clientY, id: e.pointerId, vertical: null }
@@ -111,41 +135,50 @@ function Card({
   }
 
   return (
-    <li className="flex h-[62vh] max-h-[560px] w-[72vw] max-w-[340px] flex-none snap-center">
-      <button
-        type="button"
+    <li className="flex flex-none snap-center flex-col gap-2.5">
+      <span className="flex items-center gap-2 px-1" style={{ opacity: open ? 1 : 0 }}>
+        <span
+          aria-hidden
+          className="flex size-6 items-center justify-center border text-[10px] font-bold"
+          style={{ background: a.bg, color: a.fg, borderColor: a.border }}
+        >
+          {a.glyph}
+        </span>
+        <span className="font-sans text-sm font-extrabold">{a.label}</span>
+        <span className="ml-auto text-[10px] text-dim">{subtitle}</span>
+      </span>
+      {/* Not a <button>: the app's screen inside has buttons of its own. */}
+      <div
+        role="button"
+        tabIndex={0}
         aria-label={`Open ${a.label}`}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && shot.current && onPick(id, shot.current.getBoundingClientRect())}
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={up}
         onPointerCancel={up}
-        onClick={() => !moved.current && onPick(id)}
-        onTransitionEnd={() => leaving && onRemove(id)}
-        className="flex w-full touch-pan-x cursor-pointer flex-col overflow-hidden border border-teal bg-ink p-0 text-left font-mono text-paper shadow-[0_20px_50px_rgba(0,0,0,.6)] select-none"
+        onClick={() => !moved.current && shot.current && onPick(id, shot.current.getBoundingClientRect())}
+        onTransitionEnd={(e) => e.target === e.currentTarget && leaving && onRemove(id)}
+        className="relative touch-pan-x cursor-pointer overflow-hidden bg-ink text-left font-mono text-paper shadow-[0_20px_50px_rgba(0,0,0,.6)] outline outline-teal select-none"
         style={{
+          width: screen.w * scale,
+          height: screen.h * scale,
           transform: leaving ? 'translateY(-120vh)' : `translateY(${dy}px) scale(${open ? 1 : 0.92})`,
           opacity: leaving ? 0 : 1 - Math.min(0.6, -dy / 400),
           transition: drag.current?.vertical ? 'none' : 'transform .3s cubic-bezier(.2,.8,.2,1), opacity .3s',
         }}
       >
-        <span className="flex h-12 flex-none items-center gap-2.5 border-b border-deep px-3">
-          <span
-            aria-hidden
-            className="flex size-7 items-center justify-center border text-[11px] font-bold"
-            style={{ background: a.bg, color: a.fg, borderColor: a.border }}
-          >
-            {a.glyph}
-          </span>
-          <span className="font-sans text-base font-extrabold">{a.label}</span>
-          <span className="ml-auto text-[10px] text-dim">{subtitle}</span>
+        {/* The app's own screen at full size, shrunk to the card. */}
+        <span
+          ref={shot}
+          aria-hidden
+          inert
+          className="pointer-events-none absolute top-0 left-0 flex flex-col bg-ink"
+          style={{ width: screen.w, height: screen.h, transform: `scale(${scale})`, transformOrigin: '0 0' }}
+        >
+          {preview}
         </span>
-        <span className="phone-grid relative flex flex-1 items-center justify-center">
-          <span aria-hidden className="font-sans text-[88px] font-extrabold opacity-25" style={{ color: a.border }}>
-            {a.glyph}
-          </span>
-          <span className="absolute inset-x-0 bottom-3 text-center text-[10px] text-dim">tap to open · swipe up to close</span>
-        </span>
-      </button>
+      </div>
     </li>
   )
 }
