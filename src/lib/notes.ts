@@ -103,7 +103,7 @@ export const listNotes = createServerFn({ method: 'POST' })
     if (!s) return { configured: false, notes: [], mineLeft: 0, admin: false }
     const me = await identity(data.owner, data.admin)
     const all = (await s.all()).sort(byDate)
-    const used = all.filter((n) => n.owner === me.owner || n.ip === me.ip).length
+    const used = all.filter((n) => n.owner === me.owner).length
     return { configured: true, notes: all.map((n) => publicNote(n, me.owner)), mineLeft: Math.max(0, NOTE_LIMIT - used), admin: me.admin }
   })
 
@@ -130,7 +130,7 @@ export const saveNote = createServerFn({ method: 'POST' })
     if (data.id && !existing) return { ok: false, error: 'That note no longer exists.' }
     if (existing && existing.owner !== me.owner) return { ok: false, error: 'You can only edit your own notes.' }
     if (!existing) {
-      const used = all.filter((n) => n.owner === me.owner || n.ip === me.ip).length
+      const used = all.filter((n) => n.owner === me.owner).length
       if (used >= NOTE_LIMIT) return { ok: false, error: `You can leave up to ${NOTE_LIMIT} notes.` }
       if (all.length >= MAX_TOTAL) return { ok: false, error: 'The notes folder is full.' }
     }

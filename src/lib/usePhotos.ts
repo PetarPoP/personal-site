@@ -85,3 +85,11 @@ export function usePhotos(active = true): State {
   }, [active])
   return settled ?? state
 }
+
+// Starts loading the photos next to the open one, so stepping through the viewer is instant.
+export function usePreload(srcs: (string | undefined)[]) {
+  const key = srcs.join('|')
+  useEffect(() => {
+    for (const src of key.split('|')) if (src) new Image().src = src
+  }, [key])
+}

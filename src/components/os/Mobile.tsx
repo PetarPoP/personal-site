@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { bootLog, photoCategories, profile, projects, toneColor } from '#/data/portfolio'
+import { bootLog, photoCategories, profile } from '#/data/portfolio'
 import type { PhotoCategory } from '#/data/portfolio'
-import { appFromSlug, apps, formatClock, stripes } from '#/lib/os'
+import { appFromSlug, apps, battery, formatClock, stripes } from '#/lib/os'
 import type { AppId } from '#/lib/os'
-import { blinkOn, markBooted, shouldSkipBoot, useNow, useTerminal } from '#/lib/hooks'
+import { blinkOn, dropBackLayers, markBooted, popBackLayer, useBackLayer, shouldSkipBoot, useNow, useTerminal } from '#/lib/hooks'
 import { useCvPicker } from './CvPicker'
 import { CvDocument, CvLangSwitch, HudCorners, LogoBox, Honeypot, ProgressBar, Shot, Wordmark, useMail } from './shared'
 import type { CvLang } from './shared'
+import { PhotoSwipe } from './PhotoSwipe'
+import { Recents } from './Recents'
+import type { SwipeHandle } from './PhotoSwipe'
 import { SpotifyPlayer } from './Spotify'
 import { toast } from './Toaster'
 import { TerminalBody } from './Terminal'
 import { ConfirmDelete, NoteEditor, NoteView, noteLimitHint } from './Notes'
 import { useNotes } from '#/lib/useNotes'
-import { usePhotos } from '#/lib/usePhotos'
+import { usePhotos, usePreload } from '#/lib/usePhotos'
+import { repoDate, useRepos } from '#/lib/useRepos'
 import type { Note } from '#/lib/notes'
 
 const homeApps: (AppId | 'github')[] = ['work', 'photos', 'notes', 'cv', 'mail', 'spotify', 'term', 'about', 'github']
@@ -42,6 +46,16 @@ export function Mobile({
   const [app, setApp] = useState<AppId>('work')
   const [appOpen, setAppOpen] = useState(false)
   const [cvLang, setCvLang] = useState<CvLang>('EN')
+  // The note open inside Notes ('new' while writing one); the top bar then goes back to the list.
+  const [noteOpen, setNoteOpen] = useState<string | 'new' | null>(null)
+  // Recent apps, newest first, and the recents screen opened from the gesture bar.
+  const [recents, setRecents] = useState<AppId[]>([])
+  const [recentsOpen, setRecentsOpen] = useState(false)
+  // What to do once the recents screen's history entry is gone: open an app or go home.
+  const afterRecents = useRef<AppId | 'home' | null>(null)
+  // An app opened from its recents card grows out of the card: `from` is where the card was,
+  // and `run` starts the grow on the next frame.
+  const [zoom, setZoom] = useState<{ from: DOMRect; run: boolean } | null>(null)
   const timer = useRef<ReturnType<typeof setInterval>>(undefined)
 
   // Opening an app from the home screen adds a history entry, so the phone's back button
@@ -62,6 +76,13 @@ export function Mobile({
   useEffect(() => {
     if (!enabled) return
     const onPop = () => {
+      if (popBackLayer()) {
+        const next = afterRecents.current
+        afterRecents.current = null
+        if (next === 'home') backRef.current()
+        else if (next) openRef.current(next)
+        return
+      }
       if (stacked.current) {
         stacked.current = false
         setAppOpen(false)
@@ -88,6 +109,8 @@ export function Mobile({
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         setAppOpen(false)
+        setRecents([])
+        setNoteOpen(null)
         resetSession.current()
       }),
     )
@@ -112,7 +135,11 @@ export function Mobile({
     }
     setApp(id)
     setAppOpen(true)
+    setRecents((r) => [id, ...r.filter((x) => x !== id)])
   }, [])
+
+  const openRef = useRef(openApp)
+  openRef.current = openApp
 
   const started = useRef(false)
   useEffect(() => {
@@ -130,22 +157,55 @@ export function Mobile({
   useEffect(() => () => clearInterval(timer.current), [])
 
   const back = useCallback(() => {
+    // An open photo viewer holds history entries above the app's own.
+    const extra = dropBackLayers()
     if (stacked.current) {
       stacked.current = false
       leaving.current = true
-      window.history.back()
+      window.history.go(-1 - extra)
     }
     setAppOpen(false)
   }, [])
+  const backRef = useRef(back)
+  backRef.current = back
   const term = useTerminal({ onOpen: openApp, onReboot: boot, onExit: back })
+
+  // The phone's back button closes the recents screen first.
+  useBackLayer(recentsOpen, () => setRecentsOpen(false))
+  const pickRecent = (id: AppId, from: DOMRect) => {
+    afterRecents.current = id
+    setApp(id)
+    setZoom({ from, run: false })
+    requestAnimationFrame(() => requestAnimationFrame(() => setZoom({ from, run: true })))
+    // transitionend can be skipped (reduced motion, hidden tab).
+    setTimeout(() => setZoom(null), 700)
+    setRecentsOpen(false)
+  }
+  const removeRecent = (id: AppId) => {
+    const left = recents.filter((x) => x !== id)
+    setRecents(left)
+    // Closing the app that's open underneath goes home once recents close.
+    if (id === app && appOpen) afterRecents.current = 'home'
+    if (!left.length) setRecentsOpen(false)
+  }
+  const clearRecents = () => {
+    if (appOpen) afterRecents.current = 'home'
+    setRecents([])
+    setRecentsOpen(false)
+  }
+
+  // Gesture bar: tap for home, drag up for recent apps.
+  const bar = useRef<{ y: number; id: number; opened: boolean } | null>(null)
+  const battery_ = now === null ? null : battery(now)
   resetSession.current = term.reset
 
   // Lock screen: tap or swipe up.
   const touchY = useRef<number | null>(null)
   const unlock = () => setPhase('home')
 
+  const repos = useRepos(phase === 'home')
   const subtitle: Record<AppId, string> = {
-    work: `${projects.length} repos`,
+    work: repos.loading ? 'github' : `${repos.repos.length} repos`,
     photos: 'gallery',
     notes: 'guest notes',
     cv: 'pdf · en / hr',
@@ -154,6 +214,77 @@ export function Mobile({
     term: 'guest@pop-os',
     about: 'petar popović',
   }
+
+  // An app's screen: the live one in the app layer, and a still copy for its recents card.
+  const screen = (id: AppId, live: boolean) => (
+    <>
+    <div className="mt-9 flex h-14 flex-none items-center gap-1.5 border-b border-deep px-2.5">
+      {live && id === 'notes' && noteOpen ? (
+        <>
+          <button type="button" aria-label="All notes" onClick={() => setNoteOpen(null)} className="size-11 cursor-pointer border-0 bg-transparent text-xl text-paper">
+            ←
+          </button>
+          <h2 className="m-0 flex-1 font-sans text-[22px] font-extrabold tracking-[-0.02em]">All notes</h2>
+        </>
+      ) : (
+        <>
+          <button type="button" aria-label="Back" onClick={live ? back : undefined} className="size-11 cursor-pointer border-0 bg-transparent text-xl text-paper">
+            ←
+          </button>
+          <h2 className="m-0 flex-1 font-sans text-[22px] font-extrabold tracking-[-0.02em]">{apps[id].label}</h2>
+        </>
+      )}
+      <span className="pr-2 text-[11px] text-dim">{subtitle[id]}</span>
+    </div>
+    <div
+      ref={live && id === 'term' ? term.scrollRef : undefined}
+      className={`thin-scroll relative min-h-0 flex-1 ${live ? 'overflow-auto' : 'overflow-hidden'} ${!live && id === 'term' ? 'flex flex-col justify-end' : ''}`}
+    >
+      {id === 'work' && <ProjectsApp />}
+      {id === 'photos' && <PhotosApp />}
+      {id === 'cv' && (
+        <div className="min-h-full bg-deep px-3.5 pt-3.5 pb-[100px]">
+          <div className="mb-3 flex justify-end">
+            <CvLangSwitch lang={cvLang} setLang={setCvLang} />
+          </div>
+          <CvDocument lang={cvLang} />
+        </div>
+      )}
+      {id === 'mail' && <MailApp />}
+      {id === 'term' && (
+        <div className="px-3.5 pt-3 pb-[120px] text-xs leading-[1.6]">
+          <TerminalBody term={term} compact user="guest" />
+        </div>
+      )}
+      {id === 'about' && <AboutApp />}
+      {id === 'notes' && (live ? <NotesApp open={noteOpen} setOpen={setNoteOpen} /> : <NotesApp open={null} setOpen={() => {}} />)}
+      {id === 'spotify' && <SpotifyPlayer active={live ? appOpen && phase === 'home' : recentsOpen} compact />}
+    </div>
+    {id === 'term' && (
+      <div className="thin-scroll absolute inset-x-0 bottom-6 flex gap-1.5 overflow-x-auto border-t border-deep bg-ink px-3 py-2.5">
+        {chips.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => term.run(c)}
+            className="h-9 flex-none cursor-pointer border border-teal bg-deep px-3 font-mono text-[11px] font-medium text-paper active:bg-amber active:text-ink"
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+    )}
+    {id === 'cv' && (
+      <button
+        type="button"
+        onClick={openCv}
+        className="absolute inset-x-4 bottom-[34px] flex h-[52px] cursor-pointer items-center justify-center border-0 bg-amber font-mono text-[13px] font-bold text-ink shadow-[0_10px_30px_rgba(0,0,0,.5)]"
+      >
+        Download CV.pdf ↓
+      </button>
+    )}
+    </>
+  )
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-ink font-mono text-paper select-none">
@@ -230,60 +361,20 @@ export function Mobile({
         aria-label={apps[app].label}
         inert={!appOpen}
         onKeyDown={(e) => e.key === 'Escape' && back()}
-        className="absolute inset-0 z-20 flex flex-col bg-ink transition-transform duration-[450ms] ease-[cubic-bezier(.2,.8,.2,1)]"
-        style={{ transform: appOpen ? 'none' : 'translateY(104%)' }}
+        onTransitionEnd={(e) => e.target === e.currentTarget && zoom && setZoom(null)}
+        className={`absolute inset-0 flex flex-col bg-ink ${zoom ? 'z-[46]' : 'z-20'} ${
+          zoom?.run === false ? '' : 'transition-transform duration-[450ms] ease-[cubic-bezier(.2,.8,.2,1)]'
+        }`}
+        style={
+          zoom
+            ? {
+                transformOrigin: '0 0',
+                transform: zoom.run ? 'none' : `translate(${zoom.from.x}px, ${zoom.from.y}px) scale(${zoom.from.width / window.innerWidth})`,
+              }
+            : { transform: appOpen ? 'none' : 'translateY(104%)' }
+        }
       >
-        <div className="mt-9 flex h-14 flex-none items-center gap-1.5 border-b border-deep px-2.5">
-          <button type="button" aria-label="Back" onClick={back} className="size-11 cursor-pointer border-0 bg-transparent text-xl text-paper">
-            ←
-          </button>
-          <h2 className="m-0 flex-1 font-sans text-[22px] font-extrabold tracking-[-0.02em]">{apps[app].label}</h2>
-          <span className="pr-2 text-[11px] text-dim">{subtitle[app]}</span>
-        </div>
-        <div ref={app === 'term' ? term.scrollRef : undefined} className="thin-scroll relative min-h-0 flex-1 overflow-auto">
-          {app === 'work' && <ProjectsApp />}
-          {app === 'photos' && <PhotosApp />}
-          {app === 'cv' && (
-            <div className="min-h-full bg-deep px-3.5 pt-3.5 pb-[100px]">
-              <div className="mb-3 flex justify-end">
-                <CvLangSwitch lang={cvLang} setLang={setCvLang} />
-              </div>
-              <CvDocument lang={cvLang} />
-            </div>
-          )}
-          {app === 'mail' && <MailApp />}
-          {app === 'term' && (
-            <div className="px-3.5 pt-3 pb-[120px] text-xs leading-[1.6]">
-              <TerminalBody term={term} compact user="guest" />
-            </div>
-          )}
-          {app === 'about' && <AboutApp />}
-          {app === 'notes' && <NotesApp />}
-          {app === 'spotify' && <SpotifyPlayer active={appOpen && phase === 'home'} compact />}
-        </div>
-        {app === 'term' && (
-          <div className="thin-scroll absolute inset-x-0 bottom-6 flex gap-1.5 overflow-x-auto border-t border-deep bg-ink px-3 py-2.5">
-            {chips.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => term.run(c)}
-                className="h-9 flex-none cursor-pointer border border-teal bg-deep px-3 font-mono text-[11px] font-medium text-paper active:bg-amber active:text-ink"
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-        )}
-        {app === 'cv' && (
-          <button
-            type="button"
-            onClick={openCv}
-            className="absolute inset-x-4 bottom-[34px] flex h-[52px] cursor-pointer items-center justify-center border-0 bg-amber font-mono text-[13px] font-bold text-ink shadow-[0_10px_30px_rgba(0,0,0,.5)]"
-          >
-            Download CV.pdf ↓
-          </button>
-        )}
+        {screen(app, true)}
       </section>
 
       {/* Lock screen */}
@@ -334,7 +425,9 @@ export function Mobile({
       {/* Status bar */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-50 flex h-9 items-center justify-between px-6 text-xs font-medium">
         <span>{clock?.hm}</span>
-        <span>5G ▂▄▆ 87%</span>
+        <span>
+          5G ▂▄▆ {battery_ ? `${battery_.charging ? '⚡' : ''}${battery_.pct}%` : ''}
+        </span>
       </div>
 
       {/* Boot */}
@@ -366,12 +459,37 @@ export function Mobile({
         </div>
       </div>
 
-      {/* Gesture bar: home / unlock */}
+      <Recents
+        open={recentsOpen}
+        list={recents}
+        subtitle={subtitle}
+        preview={(id) => screen(id, false)}
+        onPick={pickRecent}
+        onRemove={removeRecent}
+        onClear={clearRecents}
+        onClose={() => setRecentsOpen(false)}
+      />
+
+      {/* Gesture bar: tap for home / unlock, drag up for recent apps */}
       <button
         type="button"
         aria-label="Home"
-        onClick={() => (phase === 'lock' ? unlock() : back())}
-        className="absolute bottom-0 left-1/2 z-[70] -ml-[90px] flex h-6 w-[180px] cursor-pointer items-center justify-center border-0 bg-transparent"
+        onPointerDown={(e) => (bar.current = { y: e.clientY, id: e.pointerId, opened: false })}
+        onPointerMove={(e) => {
+          const b = bar.current
+          if (!b || b.id !== e.pointerId || b.opened || b.y - e.clientY < 30) return
+          b.opened = true
+          if (phase === 'lock') unlock()
+          else if (phase === 'home') setRecentsOpen(true)
+        }}
+        onPointerUp={() => setTimeout(() => (bar.current = null))}
+        onClick={() => {
+          if (bar.current?.opened) return
+          if (phase === 'lock') unlock()
+          else if (recentsOpen) setRecentsOpen(false)
+          else back()
+        }}
+        className="absolute bottom-0 left-1/2 z-[70] -ml-[90px] flex h-8 w-[180px] touch-none cursor-pointer items-end justify-center border-0 bg-transparent pb-2"
       >
         <span className="h-1 w-[120px] rounded-sm bg-paper" />
       </button>
@@ -379,21 +497,34 @@ export function Mobile({
   )
 }
 
+// Petar's public GitHub repos, newest first; each opens on GitHub.
 function ProjectsApp() {
+  const { repos, loading, error } = useRepos()
+  if (loading) return <p className="m-0 p-4 text-xs text-dim">Loading repos from GitHub…</p>
+  if (error)
+    return (
+      <p className="m-0 flex flex-col gap-2 p-4 text-xs text-dim">
+        {error}
+        <a href={profile.github} target="_blank" rel="noreferrer" className="text-amber">
+          {profile.githubLabel} ↗
+        </a>
+      </p>
+    )
   return (
-    <ul className="m-0 flex list-none flex-col gap-3.5 p-4">
-      {projects.map((p) => (
-        <li key={p.slug}>
-          <a href={p.href} target="_blank" rel="noreferrer" className="flex flex-col border border-deep text-paper no-underline">
-            <Shot src={p.image} tone={toneColor[p.tone]} alt={`${p.name} screenshot`} label={`screenshot · ${p.slug}`} className="h-[170px] p-2" />
-            <span className="flex flex-col gap-1.5 p-3.5">
-              <span className="flex items-baseline justify-between">
-                <h3 className="m-0 font-sans text-[21px] font-extrabold tracking-[-0.02em]">{p.name}</h3>
-                <span className="text-amber">↗</span>
-              </span>
-              <span className="text-[10px] text-amber uppercase">{p.stack}</span>
-              <span className="font-sans text-sm leading-[1.45] text-muted">{p.desc}</span>
+    <ul className="m-0 flex list-none flex-col gap-3 p-4">
+      {repos.map((r) => (
+        <li key={r.name}>
+          <a href={r.url} target="_blank" rel="noreferrer" className="flex flex-col gap-1.5 border border-deep p-3.5 text-paper no-underline active:border-amber">
+            <span className="flex items-baseline justify-between gap-3">
+              <h3 className="m-0 truncate font-sans text-[19px] font-extrabold tracking-[-0.02em]">{r.name}</h3>
+              <span className="text-amber">↗</span>
             </span>
+            <span className="flex gap-3 text-[10px] text-amber uppercase">
+              {r.language && <span>{r.language}</span>}
+              {r.stars > 0 && <span>★ {r.stars}</span>}
+              <span className="text-dim">{repoDate(r.created)}</span>
+            </span>
+            {r.desc && <span className="font-sans text-sm leading-[1.45] text-muted">{r.desc}</span>}
           </a>
         </li>
       ))}
@@ -407,8 +538,11 @@ function PhotosApp() {
   const [viewer, setViewer] = useState<string | null>(null)
   const list = gallery.frames.filter((p) => gallery.live || filter === 'All' || p.category === filter)
   const at = list.findIndex((p) => p.key === viewer)
-  const step = (dir: number) => setViewer(list[(at + dir + list.length) % list.length].key)
   const cur = at >= 0 ? list[at] : null
+  usePreload(cur ? [list[(at + 1) % list.length]?.full, list[(at - 1 + list.length) % list.length]?.full] : [])
+  const swipe = useRef<SwipeHandle>(null)
+  // The phone's back button closes the photo before the app.
+  useBackLayer(Boolean(cur), () => setViewer(null))
   return (
     <div className="flex flex-col gap-3 p-3.5">
       {!gallery.live && (
@@ -462,15 +596,24 @@ function PhotosApp() {
       </div>
       {cur && (
         <div role="dialog" aria-label={cur.caption} className="fixed inset-0 z-[5] flex flex-col bg-ink pt-12 pb-[30px]">
-          <Shot
-            key={cur.key}
-            src={cur.full}
-            tone={cur.tone}
-            alt={cur.caption}
+          <PhotoSwipe
+            ref={swipe}
+            list={list}
+            at={at}
+            onChange={(i) => setViewer(list[i].key)}
             className="flex-1"
-            label={cur.full ? undefined : `full‑res · ${cur.caption}`}
-            labelClassName="text-[10px] text-muted m-auto"
-            contain
+            render={(p) => (
+              <Shot
+                src={p.full}
+                preview={p.src !== p.full ? p.src : undefined}
+                tone={p.tone}
+                alt={p.caption}
+                className="flex-1"
+                label={p.full ? undefined : `full‑res · ${p.caption}`}
+                labelClassName="text-[10px] text-muted m-auto"
+                contain
+              />
+            )}
           />
           <div className="flex items-center gap-2 px-4 py-3.5 text-xs">
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -480,10 +623,10 @@ function PhotosApp() {
                 {cur.meta && ` · ${cur.meta}`}
               </span>
             </div>
-            <button type="button" aria-label="Previous" onClick={() => step(-1)} className="size-11 cursor-pointer border border-teal bg-transparent text-paper">
+            <button type="button" aria-label="Previous" onClick={() => swipe.current?.step(-1)} className="size-11 cursor-pointer border border-teal bg-transparent text-paper">
               ‹
             </button>
-            <button type="button" aria-label="Next" onClick={() => step(1)} className="size-11 cursor-pointer border border-teal bg-transparent text-paper">
+            <button type="button" aria-label="Next" onClick={() => swipe.current?.step(1)} className="size-11 cursor-pointer border border-teal bg-transparent text-paper">
               ›
             </button>
             <button type="button" aria-label="Close" autoFocus onClick={() => setViewer(null)} className="size-11 cursor-pointer border border-signal bg-signal text-ink">
@@ -554,9 +697,10 @@ function AboutApp() {
   )
 }
 
-function NotesApp() {
+function NotesApp({ open, setOpen }: { open: string | 'new' | null; setOpen: (v: string | 'new' | null) => void }) {
   const { status, notes, mineLeft, admin, remove } = useNotes()
-  const [open, setOpen] = useState<string | 'new' | null>(null)
+  // The phone's back button goes back to the list first.
+  useBackLayer(open !== null, () => setOpen(null))
   const [confirm, setConfirm] = useState<Note | null>(null)
   const [error, setError] = useState<string | null>(null)
   const current = open && open !== 'new' ? notes.find((n) => n.id === open) : undefined
@@ -574,9 +718,6 @@ function NotesApp() {
   if (open === 'new' || current) {
     return (
       <div className="flex min-h-full flex-col gap-3 p-4">
-        <button type="button" onClick={() => setOpen(null)} className="cursor-pointer self-start border-0 bg-transparent p-0 font-mono text-xs text-dim">
-          ← all notes
-        </button>
         <h3 className="m-0 truncate font-sans text-2xl font-extrabold">{current ? current.name : 'New note'}</h3>
         {open === 'new' ? (
           <NoteEditor compact onSaved={(n) => setOpen(n.id)} onCancel={() => setOpen(null)} />

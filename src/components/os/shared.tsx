@@ -16,6 +16,7 @@ export function Shot({
   labelClassName = 'text-[10px] text-muted',
   keepLabel = false,
   contain = false,
+  preview,
 }: {
   src?: string
   tone: string
@@ -28,11 +29,27 @@ export function Shot({
   keepLabel?: boolean
   // Show the whole image (photo viewers) instead of filling the box.
   contain?: boolean
+  // A small, already loaded version shown right away while src loads (photo viewers).
+  preview?: string
 }) {
+  const [loaded, setLoaded] = useState(false)
+  const fit = contain ? 'object-contain' : 'object-cover'
   return (
     <span className={`relative flex items-end overflow-hidden ${className}`} style={{ background: stripes(tone), ...style }}>
+      {src && preview && !loaded && <img src={preview} alt="" aria-hidden className={`absolute inset-0 size-full bg-ink blur-[2px] ${fit}`} />}
       {src ? (
-        <img src={src} alt={alt} loading="lazy" decoding="async" className={`absolute inset-0 size-full ${contain ? 'bg-ink object-contain' : 'object-cover'}`} />
+        <img
+          src={src}
+          alt={alt}
+          loading={preview ? 'eager' : 'lazy'}
+          decoding="async"
+          onLoad={() => setLoaded(true)}
+          ref={(img) => {
+            // Already in the browser cache: onLoad fired before React attached it.
+            if (img?.complete && img.naturalWidth && !loaded) setLoaded(true)
+          }}
+          className={`absolute inset-0 size-full transition-opacity duration-300 ${fit} ${contain && loaded ? 'bg-ink' : ''} ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        />
       ) : (
         <span role="img" aria-label={`Placeholder: ${alt}`} className="absolute inset-0" />
       )}

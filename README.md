@@ -31,14 +31,14 @@ npm run build    # production build (SSR)
   ~/projects, ~/photos, ~/notes), `Notes.tsx`, `Terminal.tsx`, `Mobile.tsx`, shared pieces and the CV picker.
 - `src/styles.css` — palette (`@theme` tokens) and utilities.
 
-Deep links: `/?app=projects|photos|notes|cv|mail|spotify|about` opens that window/app directly and skips the boot.
+Deep links: `/?app=projects|photos|notes|cv|mail|spotify|terminal|about` opens that window/app directly and skips the boot.
 The boot plays once per browser session and is skipped with `prefers-reduced-motion`.
 The Mail app sends through the server (see "Mail" below) and confirms with a toast.
 
 ## Guest notes
 
 Visitors can leave `.txt` notes in `~/notes` (right-click the folder → New note). Everyone sees them; each browser can keep
-up to 3 (also capped per IP) and can edit, rename or delete only its own. Notes are stored in Upstash Redis:
+up to 3 and can edit, rename or delete only its own. Notes are stored in Upstash Redis:
 
 1. In Vercel → the project → Storage (Marketplace) → add **Upstash for Redis** and connect it to this project.
    That sets `KV_REST_API_URL` and `KV_REST_API_TOKEN` (the `UPSTASH_REDIS_REST_*` names work too).
@@ -72,8 +72,8 @@ Spotify is asked at most every 15 seconds per server instance. Locally, `SPOTIFY
 - `IMMICH_SHARE_URL` — the album's share link, e.g. `https://photos.example.com/share/<key>` (a `/s/<slug>` link works too)
 
 The server reads the album (at most every 5 minutes) and every image goes through `/api/photos/<id>`, so visitors never
-see the server's address or the share key, and the photos are never copied anywhere. Browsers cache each photo for an
-hour and Vercel's edge for a day. Captions come from the photo's description in Immich, else its city, else its date.
+see the server's address or the share key, and the photos are never copied anywhere. The grid uses Immich's small thumbnails and the viewer shows
+the thumbnail at once while the larger preview loads. Browsers cache each photo for a week and Vercel's edge for a month. Captions come from the photo's description in Immich, else its city, else its date.
 Without `IMMICH_SHARE_URL` the striped placeholders from `portfolio.ts` are shown.
 
 Note: in `npm run dev`, Vite answers image requests to `/api/photos/…` itself, so the photos only load in a build
@@ -91,3 +91,10 @@ replying to the email answers them. Add in Vercel:
 
 Each visitor can send 5 messages an hour (counted in Upstash when it's connected). Without `RESEND_API_KEY`, `npm run dev`
 logs the message instead of sending it.
+
+## Projects (GitHub)
+
+~/projects lists Petar's public GitHub repos (forks left out), newest first, read live from GitHub's API on the
+server and kept for 10 minutes; clicking one opens it on GitHub. The user comes from `profile.github`. Without a token
+GitHub allows 60 requests an hour, which the cache stays well under; `GITHUB_TOKEN` (optional, a token with no scopes)
+raises that. The terminal still lists the CV projects from `portfolio.ts`.

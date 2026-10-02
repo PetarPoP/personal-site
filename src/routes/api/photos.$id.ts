@@ -22,9 +22,10 @@ export const Route = createFileRoute('/api/photos/$id')({
         return new Response(res.body, {
           headers: {
             'Content-Type': res.headers.get('Content-Type') ?? 'image/jpeg',
-            // Browsers keep it for an hour and Vercel's edge for a day, so Petar's server is
-            // asked about each photo rarely. Nothing is stored beyond these caches.
-            'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400',
+            // A photo never changes under its id: browsers keep it for a week and Vercel's edge for
+            // a month, so Petar's server is asked about each photo rarely. Nothing is stored beyond
+            // these caches.
+            'Cache-Control': 'public, max-age=604800, s-maxage=2592000, stale-while-revalidate=604800',
           },
         })
       },
