@@ -78,3 +78,10 @@ Without `IMMICH_SHARE_URL` the striped placeholders from `portfolio.ts` are show
 
 Note: in `npm run dev`, Vite answers image requests to `/api/photos/…` itself, so the photos only load in a build
 (`npm run build && node .output/server/index.mjs`).
+
+## Projects (GitHub)
+
+~/projects lists Petar's public GitHub repos (forks left out), newest first, read live from GitHub's API on the
+server and kept for 10 minutes; clicking one opens it on GitHub. The user comes from `profile.github`. Without a token
+GitHub allows 60 requests an hour, which the cache stays well under; `GITHUB_TOKEN` (optional, a token with no scopes)
+raises that. The terminal still lists the CV projects from `portfolio.ts`.

@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { photoCategories, profile, projects, toneColor } from '#/data/portfolio'
+import { photoCategories, profile, toneColor } from '#/data/portfolio'
+import type { Repo } from '#/lib/github'
 import type { PhotoCategory } from '#/data/portfolio'
 import type { Folder, WindowId } from '#/lib/os'
 import { useNotes } from '#/lib/useNotes'
 import { usePhotos, usePreload } from '#/lib/usePhotos'
 import type { Frame } from '#/lib/usePhotos'
+import { repoDate, useRepos } from '#/lib/useRepos'
 import { useCvPicker } from './CvPicker'
 import { NotesFolder } from './Notes'
 import type { OpenMenu } from './Notes'
@@ -26,12 +28,13 @@ export function FilesWindow({
   const [photoFilter, setPhotoFilter] = useState<'All' | PhotoCategory>('All')
   const notes = useNotes(false)
   const gallery = usePhotos(folder === 'photos')
+  const repos = useRepos(folder === 'projects')
   const shown = gallery.frames.filter((p) => gallery.live || photoFilter === 'All' || p.category === photoFilter)
-  const count = folder === 'projects' ? projects.length : folder === 'photos' ? shown.length : notes.notes.length
+  const count = folder === 'projects' ? repos.repos.length : folder === 'photos' ? shown.length : notes.notes.length
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[180px_minmax(0,1fr)]">
       <Places folder={folder} setFolder={setFolder} count={count} openWin={openWin} />
-      {folder === 'projects' && <ProjectsFolder />}
+      {folder === 'projects' && <ProjectsFolder {...repos} />}
       {folder === 'photos' && <PhotosFolder gallery={gallery} list={shown} filter={photoFilter} setFilter={setPhotoFilter} />}
       {folder === 'notes' && <NotesFolder openMenu={openMenu} />}
     </div>
@@ -74,61 +77,68 @@ function Places({
   )
 }
 
-function ProjectsFolder() {
+// Petar's public GitHub repos, newest first. Hovering one previews it on the right; clicking opens it on GitHub.
+function ProjectsFolder({ repos, loading, error }: { repos: Repo[]; loading: boolean; error?: string }) {
   const [sel, setSel] = useState(0)
-  const p = projects[sel]
+  const r = repos[Math.min(sel, repos.length - 1)]
+  const tones = [toneColor.a, toneColor.o, toneColor.y]
   return (
     <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_270px]">
       <div className="thin-scroll flex flex-col gap-3 overflow-auto p-3.5">
         <div className="flex justify-between text-[11px] text-dim">
           <span>~/projects</span>
-          <span>click a folder to preview</span>
+          <span>{loading ? 'loading from github…' : 'click a repo to open it on github'}</span>
         </div>
+        {error && (
+          <p className="m-0 text-xs text-dim">
+            {error}{' '}
+            <a href={profile.github} target="_blank" rel="noreferrer" className="text-amber">
+              {profile.githubLabel} ↗
+            </a>
+          </p>
+        )}
         <ul className="m-0 grid list-none grid-cols-3 gap-2.5 p-0">
-          {projects.map((pr, i) => (
-            <li key={pr.slug}>
-              <button
-                type="button"
-                aria-pressed={i === sel}
-                onClick={() => setSel(i)}
-                className="flex h-full w-full cursor-pointer flex-col gap-2 border bg-ink p-2 text-left text-paper hover:bg-deep"
-                style={{ borderColor: i === sel ? '#efab30' : '#1c3132' }}
+          {repos.map((pr, i) => (
+            <li key={pr.name}>
+              <a
+                href={pr.url}
+                target="_blank"
+                rel="noreferrer"
+                onMouseEnter={() => setSel(i)}
+                onFocus={() => setSel(i)}
+                className="flex h-full w-full flex-col gap-2 border bg-ink p-2 text-left text-paper no-underline hover:bg-deep"
+                style={{ borderColor: pr === r ? '#efab30' : '#1c3132' }}
               >
                 <Shot
-                  src={pr.image}
-                  tone={toneColor[pr.tone]}
-                  alt={`${pr.name} screenshot`}
-                  label={`${pr.slug}/`}
+                  tone={tones[i % 3]}
+                  alt=""
+                  label={`${pr.name}/`}
                   className="h-24 w-full p-1.5"
                   labelClassName="text-[10px] font-medium text-muted truncate"
                 />
-                <h3 className="m-0 font-sans text-[15px] font-bold">{pr.name}</h3>
-                <span className="text-[10px] font-medium text-amber uppercase">{pr.stack}</span>
-              </button>
+                <h3 className="m-0 truncate font-sans text-[15px] font-bold">{pr.name}</h3>
+                <span className="text-[10px] font-medium text-amber uppercase">{pr.language ?? 'repo'}</span>
+              </a>
             </li>
           ))}
         </ul>
       </div>
       <aside aria-live="polite" className="thin-scroll flex flex-col gap-3 overflow-auto border-l border-deep p-3.5">
-        <Shot src={p.image} tone={toneColor[p.tone]} alt={`${p.name} screenshot`} label={`screenshot · ${p.slug}`} className="h-40 w-full flex-none p-2" />
-        <div className="font-sans text-2xl leading-[1.05] font-extrabold tracking-[-0.02em]">{p.name}</div>
-        <div className="text-[11px] text-amber uppercase">{p.stack}</div>
-        <p className="m-0 font-sans text-sm leading-[1.45] text-muted">{p.desc}</p>
-        <div className="mt-auto flex gap-2">
-          <a href={p.href} target="_blank" rel="noreferrer" className="flex-1 bg-amber p-2.5 text-center text-xs font-bold text-ink no-underline hover:bg-signal">
-            GitHub ↗
-          </a>
-          {p.demo && (
-            <a
-              href={p.demo}
-              target="_blank"
-              rel="noreferrer"
-              className="flex-1 border border-teal p-2.5 text-center text-xs text-paper no-underline hover:border-amber hover:text-amber"
-            >
-              Live demo
+        {r && (
+          <>
+            <Shot tone={tones[repos.indexOf(r) % 3]} alt="" label={`github.com/${r.url.split('/').slice(-2).join('/')}`} className="h-40 w-full flex-none p-2" />
+            <div className="font-sans text-2xl leading-[1.05] font-extrabold tracking-[-0.02em] break-words">{r.name}</div>
+            <div className="flex gap-3 text-[11px] text-amber uppercase">
+              {r.language && <span>{r.language}</span>}
+              {r.stars > 0 && <span>★ {r.stars}</span>}
+              <span className="text-dim">{repoDate(r.created)}</span>
+            </div>
+            {r.desc && <p className="m-0 font-sans text-sm leading-[1.45] text-muted">{r.desc}</p>}
+            <a href={r.url} target="_blank" rel="noreferrer" className="mt-auto bg-amber p-2.5 text-center text-xs font-bold text-ink no-underline hover:bg-signal">
+              Open on GitHub ↗
             </a>
-          )}
-        </div>
+          </>
+        )}
       </aside>
     </div>
   )

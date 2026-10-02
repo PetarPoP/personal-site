@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { bootLog, photoCategories, profile, projects, toneColor } from '#/data/portfolio'
+import { bootLog, photoCategories, profile } from '#/data/portfolio'
 import type { PhotoCategory } from '#/data/portfolio'
 import { appFromSlug, apps, battery, formatClock, stripes } from '#/lib/os'
 import type { AppId } from '#/lib/os'
@@ -16,6 +16,7 @@ import { TerminalBody } from './Terminal'
 import { ConfirmDelete, NoteEditor, NoteView, noteLimitHint } from './Notes'
 import { useNotes } from '#/lib/useNotes'
 import { usePhotos, usePreload } from '#/lib/usePhotos'
+import { repoDate, useRepos } from '#/lib/useRepos'
 import type { Note } from '#/lib/notes'
 
 const homeApps: (AppId | 'github')[] = ['work', 'photos', 'notes', 'cv', 'mail', 'spotify', 'term', 'about', 'github']
@@ -52,6 +53,9 @@ export function Mobile({
   const [recentsOpen, setRecentsOpen] = useState(false)
   // What to do once the recents screen's history entry is gone: open an app or go home.
   const afterRecents = useRef<AppId | 'home' | null>(null)
+  // An app opened from its recents card grows out of the card: `from` is where the card was,
+  // and `run` starts the grow on the next frame.
+  const [zoom, setZoom] = useState<{ from: DOMRect; run: boolean } | null>(null)
   const timer = useRef<ReturnType<typeof setInterval>>(undefined)
 
   // Opening an app from the home screen adds a history entry, so the phone's back button
@@ -168,8 +172,13 @@ export function Mobile({
 
   // The phone's back button closes the recents screen first.
   useBackLayer(recentsOpen, () => setRecentsOpen(false))
-  const pickRecent = (id: AppId) => {
+  const pickRecent = (id: AppId, from: DOMRect) => {
     afterRecents.current = id
+    setApp(id)
+    setZoom({ from, run: false })
+    requestAnimationFrame(() => requestAnimationFrame(() => setZoom({ from, run: true })))
+    // transitionend can be skipped (reduced motion, hidden tab).
+    setTimeout(() => setZoom(null), 700)
     setRecentsOpen(false)
   }
   const removeRecent = (id: AppId) => {
@@ -194,8 +203,9 @@ export function Mobile({
   const touchY = useRef<number | null>(null)
   const unlock = () => setPhase('home')
 
+  const repos = useRepos(phase === 'home')
   const subtitle: Record<AppId, string> = {
-    work: `${projects.length} repos`,
+    work: repos.loading ? 'github' : `${repos.repos.length} repos`,
     photos: 'gallery',
     notes: 'guest notes',
     cv: 'pdf · en / hr',
@@ -204,6 +214,77 @@ export function Mobile({
     term: 'guest@pop-os',
     about: 'petar popović',
   }
+
+  // An app's screen: the live one in the app layer, and a still copy for its recents card.
+  const screen = (id: AppId, live: boolean) => (
+    <>
+    <div className="mt-9 flex h-14 flex-none items-center gap-1.5 border-b border-deep px-2.5">
+      {live && id === 'notes' && noteOpen ? (
+        <>
+          <button type="button" aria-label="All notes" onClick={() => setNoteOpen(null)} className="size-11 cursor-pointer border-0 bg-transparent text-xl text-paper">
+            ←
+          </button>
+          <h2 className="m-0 flex-1 font-sans text-[22px] font-extrabold tracking-[-0.02em]">All notes</h2>
+        </>
+      ) : (
+        <>
+          <button type="button" aria-label="Back" onClick={live ? back : undefined} className="size-11 cursor-pointer border-0 bg-transparent text-xl text-paper">
+            ←
+          </button>
+          <h2 className="m-0 flex-1 font-sans text-[22px] font-extrabold tracking-[-0.02em]">{apps[id].label}</h2>
+        </>
+      )}
+      <span className="pr-2 text-[11px] text-dim">{subtitle[id]}</span>
+    </div>
+    <div
+      ref={live && id === 'term' ? term.scrollRef : undefined}
+      className={`thin-scroll relative min-h-0 flex-1 ${live ? 'overflow-auto' : 'overflow-hidden'} ${!live && id === 'term' ? 'flex flex-col justify-end' : ''}`}
+    >
+      {id === 'work' && <ProjectsApp />}
+      {id === 'photos' && <PhotosApp />}
+      {id === 'cv' && (
+        <div className="min-h-full bg-deep px-3.5 pt-3.5 pb-[100px]">
+          <div className="mb-3 flex justify-end">
+            <CvLangSwitch lang={cvLang} setLang={setCvLang} />
+          </div>
+          <CvDocument lang={cvLang} />
+        </div>
+      )}
+      {id === 'mail' && <MailApp />}
+      {id === 'term' && (
+        <div className="px-3.5 pt-3 pb-[120px] text-xs leading-[1.6]">
+          <TerminalBody term={term} compact user="guest" />
+        </div>
+      )}
+      {id === 'about' && <AboutApp />}
+      {id === 'notes' && (live ? <NotesApp open={noteOpen} setOpen={setNoteOpen} /> : <NotesApp open={null} setOpen={() => {}} />)}
+      {id === 'spotify' && <SpotifyPlayer active={live ? appOpen && phase === 'home' : recentsOpen} compact />}
+    </div>
+    {id === 'term' && (
+      <div className="thin-scroll absolute inset-x-0 bottom-6 flex gap-1.5 overflow-x-auto border-t border-deep bg-ink px-3 py-2.5">
+        {chips.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => term.run(c)}
+            className="h-9 flex-none cursor-pointer border border-teal bg-deep px-3 font-mono text-[11px] font-medium text-paper active:bg-amber active:text-ink"
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+    )}
+    {id === 'cv' && (
+      <button
+        type="button"
+        onClick={openCv}
+        className="absolute inset-x-4 bottom-[34px] flex h-[52px] cursor-pointer items-center justify-center border-0 bg-amber font-mono text-[13px] font-bold text-ink shadow-[0_10px_30px_rgba(0,0,0,.5)]"
+      >
+        Download CV.pdf ↓
+      </button>
+    )}
+    </>
+  )
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-ink font-mono text-paper select-none">
@@ -280,71 +361,20 @@ export function Mobile({
         aria-label={apps[app].label}
         inert={!appOpen}
         onKeyDown={(e) => e.key === 'Escape' && back()}
-        className="absolute inset-0 z-20 flex flex-col bg-ink transition-transform duration-[450ms] ease-[cubic-bezier(.2,.8,.2,1)]"
-        style={{ transform: appOpen ? 'none' : 'translateY(104%)' }}
+        onTransitionEnd={(e) => e.target === e.currentTarget && zoom && setZoom(null)}
+        className={`absolute inset-0 flex flex-col bg-ink ${zoom ? 'z-[46]' : 'z-20'} ${
+          zoom?.run === false ? '' : 'transition-transform duration-[450ms] ease-[cubic-bezier(.2,.8,.2,1)]'
+        }`}
+        style={
+          zoom
+            ? {
+                transformOrigin: '0 0',
+                transform: zoom.run ? 'none' : `translate(${zoom.from.x}px, ${zoom.from.y}px) scale(${zoom.from.width / window.innerWidth})`,
+              }
+            : { transform: appOpen ? 'none' : 'translateY(104%)' }
+        }
       >
-        <div className="mt-9 flex h-14 flex-none items-center gap-1.5 border-b border-deep px-2.5">
-          {app === 'notes' && noteOpen ? (
-            <>
-              <button type="button" aria-label="All notes" onClick={() => setNoteOpen(null)} className="size-11 cursor-pointer border-0 bg-transparent text-xl text-paper">
-                ←
-              </button>
-              <h2 className="m-0 flex-1 font-sans text-[22px] font-extrabold tracking-[-0.02em]">All notes</h2>
-            </>
-          ) : (
-            <>
-              <button type="button" aria-label="Back" onClick={back} className="size-11 cursor-pointer border-0 bg-transparent text-xl text-paper">
-                ←
-              </button>
-              <h2 className="m-0 flex-1 font-sans text-[22px] font-extrabold tracking-[-0.02em]">{apps[app].label}</h2>
-            </>
-          )}
-          <span className="pr-2 text-[11px] text-dim">{subtitle[app]}</span>
-        </div>
-        <div ref={app === 'term' ? term.scrollRef : undefined} className="thin-scroll relative min-h-0 flex-1 overflow-auto">
-          {app === 'work' && <ProjectsApp />}
-          {app === 'photos' && <PhotosApp />}
-          {app === 'cv' && (
-            <div className="min-h-full bg-deep px-3.5 pt-3.5 pb-[100px]">
-              <div className="mb-3 flex justify-end">
-                <CvLangSwitch lang={cvLang} setLang={setCvLang} />
-              </div>
-              <CvDocument lang={cvLang} />
-            </div>
-          )}
-          {app === 'mail' && <MailApp />}
-          {app === 'term' && (
-            <div className="px-3.5 pt-3 pb-[120px] text-xs leading-[1.6]">
-              <TerminalBody term={term} compact user="guest" />
-            </div>
-          )}
-          {app === 'about' && <AboutApp />}
-          {app === 'notes' && <NotesApp open={noteOpen} setOpen={setNoteOpen} />}
-          {app === 'spotify' && <SpotifyPlayer active={appOpen && phase === 'home'} compact />}
-        </div>
-        {app === 'term' && (
-          <div className="thin-scroll absolute inset-x-0 bottom-6 flex gap-1.5 overflow-x-auto border-t border-deep bg-ink px-3 py-2.5">
-            {chips.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => term.run(c)}
-                className="h-9 flex-none cursor-pointer border border-teal bg-deep px-3 font-mono text-[11px] font-medium text-paper active:bg-amber active:text-ink"
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-        )}
-        {app === 'cv' && (
-          <button
-            type="button"
-            onClick={openCv}
-            className="absolute inset-x-4 bottom-[34px] flex h-[52px] cursor-pointer items-center justify-center border-0 bg-amber font-mono text-[13px] font-bold text-ink shadow-[0_10px_30px_rgba(0,0,0,.5)]"
-          >
-            Download CV.pdf ↓
-          </button>
-        )}
+        {screen(app, true)}
       </section>
 
       {/* Lock screen */}
@@ -433,6 +463,7 @@ export function Mobile({
         open={recentsOpen}
         list={recents}
         subtitle={subtitle}
+        preview={(id) => screen(id, false)}
         onPick={pickRecent}
         onRemove={removeRecent}
         onClear={clearRecents}
@@ -466,21 +497,34 @@ export function Mobile({
   )
 }
 
+// Petar's public GitHub repos, newest first; each opens on GitHub.
 function ProjectsApp() {
+  const { repos, loading, error } = useRepos()
+  if (loading) return <p className="m-0 p-4 text-xs text-dim">Loading repos from GitHub…</p>
+  if (error)
+    return (
+      <p className="m-0 flex flex-col gap-2 p-4 text-xs text-dim">
+        {error}
+        <a href={profile.github} target="_blank" rel="noreferrer" className="text-amber">
+          {profile.githubLabel} ↗
+        </a>
+      </p>
+    )
   return (
-    <ul className="m-0 flex list-none flex-col gap-3.5 p-4">
-      {projects.map((p) => (
-        <li key={p.slug}>
-          <a href={p.href} target="_blank" rel="noreferrer" className="flex flex-col border border-deep text-paper no-underline">
-            <Shot src={p.image} tone={toneColor[p.tone]} alt={`${p.name} screenshot`} label={`screenshot · ${p.slug}`} className="h-[170px] p-2" />
-            <span className="flex flex-col gap-1.5 p-3.5">
-              <span className="flex items-baseline justify-between">
-                <h3 className="m-0 font-sans text-[21px] font-extrabold tracking-[-0.02em]">{p.name}</h3>
-                <span className="text-amber">↗</span>
-              </span>
-              <span className="text-[10px] text-amber uppercase">{p.stack}</span>
-              <span className="font-sans text-sm leading-[1.45] text-muted">{p.desc}</span>
+    <ul className="m-0 flex list-none flex-col gap-3 p-4">
+      {repos.map((r) => (
+        <li key={r.name}>
+          <a href={r.url} target="_blank" rel="noreferrer" className="flex flex-col gap-1.5 border border-deep p-3.5 text-paper no-underline active:border-amber">
+            <span className="flex items-baseline justify-between gap-3">
+              <h3 className="m-0 truncate font-sans text-[19px] font-extrabold tracking-[-0.02em]">{r.name}</h3>
+              <span className="text-amber">↗</span>
             </span>
+            <span className="flex gap-3 text-[10px] text-amber uppercase">
+              {r.language && <span>{r.language}</span>}
+              {r.stars > 0 && <span>★ {r.stars}</span>}
+              <span className="text-dim">{repoDate(r.created)}</span>
+            </span>
+            {r.desc && <span className="font-sans text-sm leading-[1.45] text-muted">{r.desc}</span>}
           </a>
         </li>
       ))}
