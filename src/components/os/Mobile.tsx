@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { bootLog, photoCategories, profile } from '#/data/portfolio'
-import type { PhotoCategory } from '#/data/portfolio'
+import { ArrowLeft, ArrowUpRight, ChevronLeft, ChevronRight, ChevronUp, CornerDownLeft, Download, Star, X } from 'lucide-react'
+import type { PointerEvent } from 'react'
+import { bootLog, profile } from '#/data/portfolio'
 import { appFromSlug, apps, battery, formatClock, stripes } from '#/lib/os'
 import type { AppId } from '#/lib/os'
 import { blinkOn, dropBackLayers, markBooted, popBackLayer, useBackLayer, shouldSkipBoot, useNow, useTerminal } from '#/lib/hooks'
 import { useCvPicker } from './CvPicker'
-import { CvDocument, CvLangSwitch, HudCorners, LogoBox, MailSent, ProgressBar, Shot, Wordmark, useMailto } from './shared'
+import { CvDocument, CvLangSwitch, HudCorners, LogoBox, MailSent, ProgressBar, Shot, Wordmark, ic, useMailto } from './shared'
 import type { CvLang } from './shared'
 import { PhotoSwipe } from './PhotoSwipe'
-import { Recents } from './Recents'
+import { ScreenLight, Shade, StatusBar, quickDefaults } from './Shade'
+import type { Quick } from './Shade'
 import type { SwipeHandle } from './PhotoSwipe'
 import { SpotifyPlayer } from './Spotify'
 import { toast } from './Toaster'
@@ -48,14 +50,13 @@ export function Mobile({
   const [cvLang, setCvLang] = useState<CvLang>('EN')
   // The note open inside Notes ('new' while writing one); the top bar then goes back to the list.
   const [noteOpen, setNoteOpen] = useState<string | 'new' | null>(null)
-  // Recent apps, newest first, and the recents screen opened from the gesture bar.
-  const [recents, setRecents] = useState<AppId[]>([])
-  const [recentsOpen, setRecentsOpen] = useState(false)
-  // What to do once the recents screen's history entry is gone: open an app or go home.
-  const afterRecents = useRef<AppId | 'home' | null>(null)
-  // An app opened from its recents card grows out of the card: `from` is where the card was,
-  // and `run` starts the grow on the next frame.
-  const [zoom, setZoom] = useState<{ from: DOMRect; run: boolean } | null>(null)
+  // The pull-down shade from the status bar: open, or following the finger (`shadeDrag`, px).
+  const [shadeOpen, setShadeOpen] = useState(false)
+  const [shadeDrag, setShadeDrag] = useState<number | null>(null)
+  const [quick, setQuick] = useState<Quick>(quickDefaults)
+  const [dismissed, setDismissed] = useState<string[]>([])
+  // The app a notification opens, once the shade's history entry is gone.
+  const afterShade = useRef<AppId | null>(null)
   const timer = useRef<ReturnType<typeof setInterval>>(undefined)
 
   // Opening an app from the home screen adds a history entry, so the phone's back button
@@ -77,10 +78,9 @@ export function Mobile({
     if (!enabled) return
     const onPop = () => {
       if (popBackLayer()) {
-        const next = afterRecents.current
-        afterRecents.current = null
-        if (next === 'home') backRef.current()
-        else if (next) openRef.current(next)
+        const next = afterShade.current
+        afterShade.current = null
+        if (next) openRef.current(next)
         return
       }
       if (stacked.current) {
@@ -109,7 +109,9 @@ export function Mobile({
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         setAppOpen(false)
-        setRecents([])
+        setShadeOpen(false)
+        setQuick(quickDefaults)
+        setDismissed([])
         setNoteOpen(null)
         resetSession.current()
       }),
@@ -135,7 +137,6 @@ export function Mobile({
     }
     setApp(id)
     setAppOpen(true)
-    setRecents((r) => [id, ...r.filter((x) => x !== id)])
   }, [])
 
   const openRef = useRef(openApp)
@@ -170,32 +171,35 @@ export function Mobile({
   backRef.current = back
   const term = useTerminal({ onOpen: openApp, onReboot: boot, onExit: back })
 
-  // The phone's back button closes the recents screen first.
-  useBackLayer(recentsOpen, () => setRecentsOpen(false))
-  const pickRecent = (id: AppId, from: DOMRect) => {
-    afterRecents.current = id
-    setApp(id)
-    setZoom({ from, run: false })
-    requestAnimationFrame(() => requestAnimationFrame(() => setZoom({ from, run: true })))
-    // transitionend can be skipped (reduced motion, hidden tab).
-    setTimeout(() => setZoom(null), 700)
-    setRecentsOpen(false)
+  // Status bar: pull down for the shade.
+  const pullShade = (e: PointerEvent<HTMLElement>) => {
+    if (phase === 'boot') return
+    const y0 = e.clientY
+    const id = e.pointerId
+    let dy = 0
+    const move = (ev: globalThis.PointerEvent) => {
+      if (ev.pointerId !== id) return
+      dy = Math.max(0, ev.clientY - y0)
+      setShadeDrag(dy)
+    }
+    const end = (ev: globalThis.PointerEvent) => {
+      if (ev.pointerId !== id) return
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', end)
+      window.removeEventListener('pointercancel', end)
+      setShadeDrag(null)
+      // A tap or a pull past 80px opens it.
+      if (ev.type === 'pointerup' && (dy > 80 || dy < 6)) setShadeOpen(true)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', end)
+    window.addEventListener('pointercancel', end)
   }
-  const removeRecent = (id: AppId) => {
-    const left = recents.filter((x) => x !== id)
-    setRecents(left)
-    // Closing the app that's open underneath goes home once recents close.
-    if (id === app && appOpen) afterRecents.current = 'home'
-    if (!left.length) setRecentsOpen(false)
-  }
-  const clearRecents = () => {
-    if (appOpen) afterRecents.current = 'home'
-    setRecents([])
-    setRecentsOpen(false)
+  const openFromShade = (id: AppId) => {
+    afterShade.current = id
+    setShadeOpen(false)
   }
 
-  // Gesture bar: tap for home, drag up for recent apps.
-  const bar = useRef<{ y: number; id: number; opened: boolean } | null>(null)
   const battery_ = now === null ? null : battery(now)
   resetSession.current = term.reset
 
@@ -215,21 +219,20 @@ export function Mobile({
     about: 'petar popović',
   }
 
-  // An app's screen: the live one in the app layer, and a still copy for its recents card.
-  const screen = (id: AppId, live: boolean) => (
+  const screen = (id: AppId) => (
     <>
     <div className="mt-9 flex h-14 flex-none items-center gap-1.5 border-b border-deep px-2.5">
-      {live && id === 'notes' && noteOpen ? (
+      {id === 'notes' && noteOpen ? (
         <>
           <button type="button" aria-label="All notes" onClick={() => setNoteOpen(null)} className="size-11 cursor-pointer border-0 bg-transparent text-xl text-paper">
-            ←
+            <ArrowLeft aria-hidden className={"mx-auto size-6"} />
           </button>
           <h2 className="m-0 flex-1 font-sans text-[22px] font-extrabold tracking-[-0.02em]">All notes</h2>
         </>
       ) : (
         <>
-          <button type="button" aria-label="Back" onClick={live ? back : undefined} className="size-11 cursor-pointer border-0 bg-transparent text-xl text-paper">
-            ←
+          <button type="button" aria-label="Back" onClick={back} className="size-11 cursor-pointer border-0 bg-transparent text-xl text-paper">
+            <ArrowLeft aria-hidden className={"mx-auto size-6"} />
           </button>
           <h2 className="m-0 flex-1 font-sans text-[22px] font-extrabold tracking-[-0.02em]">{apps[id].label}</h2>
         </>
@@ -237,8 +240,8 @@ export function Mobile({
       <span className="pr-2 text-[11px] text-dim">{subtitle[id]}</span>
     </div>
     <div
-      ref={live && id === 'term' ? term.scrollRef : undefined}
-      className={`thin-scroll relative min-h-0 flex-1 ${live ? 'overflow-auto' : 'overflow-hidden'} ${!live && id === 'term' ? 'flex flex-col justify-end' : ''}`}
+      ref={id === 'term' ? term.scrollRef : undefined}
+      className="thin-scroll relative min-h-0 flex-1 overflow-auto"
     >
       {id === 'work' && <ProjectsApp />}
       {id === 'photos' && <PhotosApp />}
@@ -257,8 +260,8 @@ export function Mobile({
         </div>
       )}
       {id === 'about' && <AboutApp />}
-      {id === 'notes' && (live ? <NotesApp open={noteOpen} setOpen={setNoteOpen} /> : <NotesApp open={null} setOpen={() => {}} />)}
-      {id === 'spotify' && <SpotifyPlayer active={live ? appOpen && phase === 'home' : recentsOpen} compact />}
+      {id === 'notes' && <NotesApp open={noteOpen} setOpen={setNoteOpen} />}
+      {id === 'spotify' && <SpotifyPlayer active={appOpen && phase === 'home'} compact />}
     </div>
     {id === 'term' && (
       <div className="thin-scroll absolute inset-x-0 bottom-6 flex gap-1.5 overflow-x-auto border-t border-deep bg-ink px-3 py-2.5">
@@ -280,7 +283,7 @@ export function Mobile({
         onClick={openCv}
         className="absolute inset-x-4 bottom-[34px] flex h-[52px] cursor-pointer items-center justify-center border-0 bg-amber font-mono text-[13px] font-bold text-ink shadow-[0_10px_30px_rgba(0,0,0,.5)]"
       >
-        Download CV.pdf ↓
+        Download CV.pdf <Download aria-hidden className={"ml-2 size-4"} />
       </button>
     )}
     </>
@@ -326,7 +329,7 @@ export function Mobile({
           {homeApps.map((id) => {
             const a =
               id === 'github'
-                ? { label: 'GitHub', glyph: '↗', bg: '#0d1b1c', fg: '#efab30', border: '#efab30', slug: 'github' }
+                ? { label: 'GitHub', glyph: <ArrowUpRight aria-hidden className={"size-6"} />, bg: '#0d1b1c', fg: '#efab30', border: '#efab30', slug: 'github' }
                 : apps[id]
             return (
               <a
@@ -361,20 +364,10 @@ export function Mobile({
         aria-label={apps[app].label}
         inert={!appOpen}
         onKeyDown={(e) => e.key === 'Escape' && back()}
-        onTransitionEnd={(e) => e.target === e.currentTarget && zoom && setZoom(null)}
-        className={`absolute inset-0 flex flex-col bg-ink ${zoom ? 'z-[46]' : 'z-20'} ${
-          zoom?.run === false ? '' : 'transition-transform duration-[450ms] ease-[cubic-bezier(.2,.8,.2,1)]'
-        }`}
-        style={
-          zoom
-            ? {
-                transformOrigin: '0 0',
-                transform: zoom.run ? 'none' : `translate(${zoom.from.x}px, ${zoom.from.y}px) scale(${zoom.from.width / window.innerWidth})`,
-              }
-            : { transform: appOpen ? 'none' : 'translateY(104%)' }
-        }
+        className="absolute inset-0 z-20 flex flex-col bg-ink transition-transform duration-[450ms] ease-[cubic-bezier(.2,.8,.2,1)]"
+        style={{ transform: appOpen ? 'none' : 'translateY(104%)' }}
       >
-        {screen(app, true)}
+        {screen(app)}
       </section>
 
       {/* Lock screen */}
@@ -417,18 +410,12 @@ export function Mobile({
           </div>
         </div>
         <div className="absolute inset-x-0 bottom-14 flex flex-col items-center gap-2 text-xs">
-          <span className="bob text-lg text-amber">↑</span>
+          <ChevronUp aria-hidden className="bob size-6 text-amber" />
           Tap to unlock
         </div>
       </div>
 
-      {/* Status bar */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-50 flex h-9 items-center justify-between px-6 text-xs font-medium">
-        <span>{clock?.hm}</span>
-        <span>
-          5G ▂▄▆ {battery_ ? `${battery_.charging ? '⚡' : ''}${battery_.pct}%` : ''}
-        </span>
-      </div>
+      <StatusBar time={clock?.hm} battery={battery_} quick={quick} onPull={pullShade} />
 
       {/* Boot */}
       <div
@@ -459,40 +446,18 @@ export function Mobile({
         </div>
       </div>
 
-      <Recents
-        open={recentsOpen}
-        list={recents}
-        subtitle={subtitle}
-        preview={(id) => screen(id, false)}
-        onPick={pickRecent}
-        onRemove={removeRecent}
-        onClear={clearRecents}
-        onClose={() => setRecentsOpen(false)}
+      <Shade
+        open={shadeOpen}
+        drag={shadeDrag}
+        clock={clock}
+        quick={quick}
+        setQuick={setQuick}
+        dismissed={dismissed}
+        setDismissed={setDismissed}
+        onOpenApp={openFromShade}
+        onClose={() => setShadeOpen(false)}
       />
-
-      {/* Gesture bar: tap for home / unlock, drag up for recent apps */}
-      <button
-        type="button"
-        aria-label="Home"
-        onPointerDown={(e) => (bar.current = { y: e.clientY, id: e.pointerId, opened: false })}
-        onPointerMove={(e) => {
-          const b = bar.current
-          if (!b || b.id !== e.pointerId || b.opened || b.y - e.clientY < 30) return
-          b.opened = true
-          if (phase === 'lock') unlock()
-          else if (phase === 'home') setRecentsOpen(true)
-        }}
-        onPointerUp={() => setTimeout(() => (bar.current = null))}
-        onClick={() => {
-          if (bar.current?.opened) return
-          if (phase === 'lock') unlock()
-          else if (recentsOpen) setRecentsOpen(false)
-          else back()
-        }}
-        className="absolute bottom-0 left-1/2 z-[70] -ml-[90px] flex h-8 w-[180px] touch-none cursor-pointer items-end justify-center border-0 bg-transparent pb-2"
-      >
-        <span className="h-1 w-[120px] rounded-sm bg-paper" />
-      </button>
+      <ScreenLight quick={quick} />
     </div>
   )
 }
@@ -506,7 +471,7 @@ function ProjectsApp() {
       <p className="m-0 flex flex-col gap-2 p-4 text-xs text-dim">
         {error}
         <a href={profile.github} target="_blank" rel="noreferrer" className="text-amber">
-          {profile.githubLabel} ↗
+          {profile.githubLabel} <ArrowUpRight aria-hidden className={ic} />
         </a>
       </p>
     )
@@ -517,11 +482,15 @@ function ProjectsApp() {
           <a href={r.url} target="_blank" rel="noreferrer" className="flex flex-col gap-1.5 border border-deep p-3.5 text-paper no-underline active:border-amber">
             <span className="flex items-baseline justify-between gap-3">
               <h3 className="m-0 truncate font-sans text-[19px] font-extrabold tracking-[-0.02em]">{r.name}</h3>
-              <span className="text-amber">↗</span>
+              <ArrowUpRight aria-hidden className={"size-5 flex-none text-amber"} />
             </span>
             <span className="flex gap-3 text-[10px] text-amber uppercase">
               {r.language && <span>{r.language}</span>}
-              {r.stars > 0 && <span>★ {r.stars}</span>}
+              {r.stars > 0 && (
+                <span>
+                  <Star aria-hidden className={ic} /> {r.stars}
+                </span>
+              )}
               <span className="text-dim">{repoDate(r.created)}</span>
             </span>
             {r.desc && <span className="font-sans text-sm leading-[1.45] text-muted">{r.desc}</span>}
@@ -534,9 +503,8 @@ function ProjectsApp() {
 
 function PhotosApp() {
   const gallery = usePhotos()
-  const [filter, setFilter] = useState<'All' | PhotoCategory>('All')
   const [viewer, setViewer] = useState<string | null>(null)
-  const list = gallery.frames.filter((p) => gallery.live || filter === 'All' || p.category === filter)
+  const list = gallery.frames
   const at = list.findIndex((p) => p.key === viewer)
   const cur = at >= 0 ? list[at] : null
   usePreload(cur ? [list[(at + 1) % list.length]?.full, list[(at - 1 + list.length) % list.length]?.full] : [])
@@ -545,25 +513,6 @@ function PhotosApp() {
   useBackLayer(Boolean(cur), () => setViewer(null))
   return (
     <div className="flex flex-col gap-3 p-3.5">
-      {!gallery.live && (
-        <div role="tablist" aria-label="Filter photos" className="thin-scroll flex gap-1.5 overflow-x-auto pb-0.5">
-          {photoCategories.map((c) => (
-            <button
-              key={c}
-              role="tab"
-              type="button"
-              aria-selected={c === filter}
-              onClick={() => {
-                setFilter(c)
-                setViewer(null)
-              }}
-              className={`h-[34px] flex-none cursor-pointer border px-3 font-mono text-[11px] font-medium ${c === filter ? 'border-amber bg-amber text-ink' : 'border-teal bg-transparent text-paper'}`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      )}
       {gallery.loading && <p className="m-0 text-xs text-dim">developing film…</p>}
       {gallery.error && (
         <div className="flex flex-col gap-2 text-xs">
@@ -624,13 +573,13 @@ function PhotosApp() {
               </span>
             </div>
             <button type="button" aria-label="Previous" onClick={() => swipe.current?.step(-1)} className="size-11 cursor-pointer border border-teal bg-transparent text-paper">
-              ‹
+              <ChevronLeft aria-hidden className={"mx-auto size-5"} />
             </button>
             <button type="button" aria-label="Next" onClick={() => swipe.current?.step(1)} className="size-11 cursor-pointer border border-teal bg-transparent text-paper">
-              ›
+              <ChevronRight aria-hidden className={"mx-auto size-5"} />
             </button>
             <button type="button" aria-label="Close" autoFocus onClick={() => setViewer(null)} className="size-11 cursor-pointer border border-signal bg-signal text-ink">
-              ×
+              <X aria-hidden className={"mx-auto size-5"} />
             </button>
           </div>
         </div>
@@ -664,7 +613,7 @@ function MailApp() {
         <textarea name="message" required placeholder="Hi Petar, …" className={`h-[200px] resize-none p-3 font-sans text-[15px] leading-[1.5] ${field}`} />
       </label>
       <button type="submit" className="h-[52px] cursor-pointer border-0 bg-amber font-mono text-sm font-bold text-ink active:bg-signal">
-        Send ⏎
+        Send <CornerDownLeft aria-hidden className={ic} />
       </button>
     </form>
   )
@@ -683,10 +632,10 @@ function AboutApp() {
       <p className="m-0 font-sans text-[15px] leading-[1.55] text-muted">{profile.about}</p>
       <div className="grid grid-cols-2 gap-2">
         <a href={profile.github} target="_blank" rel="noreferrer" className="flex h-12 items-center justify-center bg-amber text-xs font-bold text-ink no-underline">
-          GitHub ↗
+          GitHub <ArrowUpRight aria-hidden className={"ml-1.5 size-4"} />
         </a>
         <button type="button" onClick={openCv} className="flex h-12 cursor-pointer items-center justify-center border border-teal bg-transparent font-mono text-xs text-paper">
-          CV.pdf ↓
+          CV.pdf <Download aria-hidden className={"ml-1.5 size-4"} />
         </button>
       </div>
     </div>

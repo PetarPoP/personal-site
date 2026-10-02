@@ -1,4 +1,5 @@
 import { Toaster as Sonner, toast } from 'sonner'
+import { Check, Info, TriangleAlert, X } from 'lucide-react'
 
 // Small system notifications ("sonner" toasts) in the POP/OS style:
 // amber edge when something worked, orange-red when it couldn't be done.
@@ -26,7 +27,7 @@ export function Toaster({ mobile }: { mobile: boolean }) {
           info: 'border-l-mist [&_[data-icon]]:text-mist',
         },
       }}
-      icons={{ success: '✓', error: '✕', info: '›', warning: '!' }}
+      icons={{ success: <Check className="size-[15px]" />, error: <X className="size-[15px]" />, info: <Info className="size-[15px]" />, warning: <TriangleAlert className="size-[15px]" /> }}
     />
   )
 }
