@@ -5,6 +5,9 @@ import { sendMail } from '#/lib/mail'
 import { stripes } from '#/lib/os'
 import { toast } from './Toaster'
 
+// Lucide icons set inline with text: as tall as the text around them.
+export const ic = 'inline-block size-[1.15em] align-[-0.2em]'
+
 // A photo or screenshot: the real image when there is one, the striped placeholder otherwise.
 export function Shot({
   src,

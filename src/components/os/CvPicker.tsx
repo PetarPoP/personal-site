@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useRef } from 'react'
+import { Download, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { profile } from '#/data/portfolio'
 import { toast } from './Toaster'
+import { ic } from './shared'
 
 // Every "Download CV" button opens one picker that asks for the language first.
 const CvPickerContext = createContext<() => void>(() => {})
@@ -34,7 +36,7 @@ export function CvPickerProvider({ children }: { children: ReactNode }) {
             aria-label="Close"
             className="h-6 w-[26px] cursor-pointer border border-teal bg-transparent text-xs text-paper hover:border-signal hover:bg-signal hover:text-ink"
           >
-            ×
+            <X aria-hidden className={ic} />
           </button>
         </div>
         <div className="flex flex-col p-2">
@@ -53,7 +55,7 @@ export function CvPickerProvider({ children }: { children: ReactNode }) {
                 <span className="text-[13px] font-bold text-amber">[{cv.lang}]</span>
                 <span className="font-sans text-lg font-semibold">{cv.label}</span>
               </span>
-              <span className="text-[11px] text-dim group-hover:text-amber">{cv.file} ↓</span>
+              <span className="text-[11px] text-dim group-hover:text-amber">{cv.file} <Download aria-hidden className={ic} /></span>
             </a>
           ))}
         </div>

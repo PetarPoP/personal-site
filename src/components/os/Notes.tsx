@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { CornerDownLeft, RefreshCw } from 'lucide-react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { MAX_NAME, MAX_SIG, MAX_TEXT, NOTE_LIMIT } from '#/lib/notes'
 import type { Note } from '#/lib/notes'
@@ -126,7 +127,8 @@ export function NoteEditor({
           disabled={busy || !text.trim() || !dirty}
           className={`flex-1 cursor-pointer border-0 bg-amber font-mono font-bold text-ink hover:bg-signal disabled:cursor-default disabled:opacity-50 disabled:hover:bg-amber ${compact ? 'h-[52px] text-sm' : 'p-2.5 text-xs'}`}
         >
-          {busy ? 'Saving…' : note ? 'Save ⏎' : 'Create note ⏎'}
+          {busy ? 'Saving…' : note ? 'Save' : 'Create note'}
+          {!busy && <CornerDownLeft aria-hidden className="ml-1.5 inline-block size-[1.15em] align-[-0.2em]" />}
         </button>
         {onDelete && (
           <button
@@ -249,7 +251,7 @@ export function NotesFolder({ openMenu }: { openMenu: OpenMenu }) {
     openMenu(e, [
       { label: '+ New note', onSelect: newNote, disabled: !canCreate, hint: canCreate ? undefined : createHint },
       { label: 'Select all', onSelect: () => (setSel(null), setPicked(new Set(notes.map((n) => n.id)))), disabled: !notes.length, hint: 'empty' },
-      { label: '⟳ Refresh', onSelect: () => void load().then(() => toast.success('Notes refreshed')) },
+      { label: 'Refresh', icon: RefreshCw, onSelect: () => void load().then(() => toast.success('Notes refreshed')) },
     ])
   }
   const noteMenu = (e: ReactMouseEvent, n: Note) => {
