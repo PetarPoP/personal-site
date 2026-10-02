@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { ArrowUpRight, BatteryMedium, ChevronRight, Copy, CornerDownLeft, Download, Minus, Power, RefreshCw, Square, Wifi, X } from 'lucide-react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { bootLog, profile } from '#/data/portfolio'
 import { appFolder, apps, folderApp, formatClock, windowIds } from '#/lib/os'
@@ -8,7 +9,7 @@ import { useCvPicker } from './CvPicker'
 import { ContextMenu } from './ContextMenu'
 import type { MenuItem, MenuState } from './ContextMenu'
 import { FilesWindow } from './Files'
-import { CvDocument, CvLangSwitch, HudCorners, LogoBox, MailSent, ProgressBar, Wordmark, useMailto } from './shared'
+import { CvDocument, CvLangSwitch, HudCorners, LogoBox, MailSent, ProgressBar, Wordmark, ic, useMailto } from './shared'
 import type { CvLang } from './shared'
 import { SpotifyPlayer } from './Spotify'
 import { toast } from './Toaster'
@@ -243,7 +244,7 @@ export function Desktop({
           </span>
         </div>
         <button type="button" aria-label="Dismiss" onClick={() => setToast(false)} className="cursor-pointer self-start border-0 bg-transparent text-sm text-paper">
-          ×
+          <X aria-hidden className={ic} />
         </button>
       </div>
 
@@ -287,7 +288,7 @@ export function Desktop({
               onClick={() => finishBoot()}
               className="absolute right-6 bottom-5 cursor-pointer border border-teal bg-transparent px-3.5 py-2 font-mono text-[11px] font-medium text-muted hover:border-amber hover:text-amber"
             >
-              skip boot ›
+              skip boot <ChevronRight aria-hidden className={ic} />
             </button>
           </>
         )}
@@ -638,16 +639,16 @@ function Session({
   const desktopMenu = (e: ReactMouseEvent) => {
     e.preventDefault()
     openMenu(e, [
-      { label: '⟳ Refresh  (reset icons)', onSelect: resetIcons },
+      { label: 'Refresh  (reset icons)', icon: RefreshCw, onSelect: resetIcons },
       { label: '+ New note', disabled: true, hint: 'only in ~/notes', reason: 'New notes can only be made inside ~/notes' },
       { label: 'Select all', onSelect: () => setSelected(new Set(launchers)) },
       'sep',
       { label: 'Open terminal', onSelect: () => openWin('term') },
       { label: 'Open files', onSelect: () => openApp('work') },
       { label: 'Leave a note…', onSelect: () => openApp('notes') },
-      { label: 'Download CV ↓', onSelect: openCv },
+      { label: 'Download CV', icon: Download, onSelect: openCv },
       'sep',
-      { label: '⟳ Reboot', onSelect: onReboot, danger: true },
+      { label: 'Reboot', icon: Power, onSelect: onReboot, danger: true },
     ])
   }
 
@@ -728,7 +729,7 @@ function Session({
                   danger: true,
                 },
                 'sep',
-                { label: '⟳ Refresh  (reset icons)', onSelect: resetIcons },
+                { label: 'Refresh  (reset icons)', icon: RefreshCw, onSelect: resetIcons },
               ])
             }}
           />
@@ -763,7 +764,7 @@ function Session({
             <CvLangSwitch lang={cvLang} setLang={setCvLang} />
             <span>page 1 / 1</span>
             <button type="button" onClick={openCv} className="ml-auto cursor-pointer border-0 bg-amber px-3 py-[7px] font-mono text-[11px] font-bold text-ink hover:bg-signal">
-              Download ↓
+              Download <Download aria-hidden className={ic} />
             </button>
           </div>
           <div className="thin-scroll min-h-0 flex-1 overflow-auto bg-deep p-[22px]">
@@ -798,8 +799,12 @@ function Session({
         </button>
         <span className="text-muted">{active ? WINDOW_NAME[active] : 'Desktop'}</span>
         <span className="ml-auto text-muted">EN</span>
-        <span className="text-muted">▂▄▆ wifi</span>
-        <span className="text-muted">BAT 87%</span>
+        <span className="text-muted">
+          <Wifi aria-hidden className={ic} /> wifi
+        </span>
+        <span className="text-muted">
+          <BatteryMedium aria-hidden className={ic} /> 87%
+        </span>
         <span className="whitespace-pre">{clock ? `${clock.day}  ${clock.hm}` : ''}</span>
       </header>
 
@@ -835,10 +840,10 @@ function Session({
             }}
             className="cursor-pointer border-0 bg-transparent px-2.5 py-2 text-left font-mono text-xs text-paper hover:bg-deep hover:text-amber"
           >
-            Download CV ↓
+            Download CV <Download aria-hidden className={ic} />
           </button>
           <a role="menuitem" href={profile.github} target="_blank" rel="noreferrer" className="px-2.5 py-2 text-paper no-underline hover:bg-deep hover:text-amber">
-            GitHub ↗
+            GitHub <ArrowUpRight aria-hidden className={ic} />
           </a>
           <button
             role="menuitem"
@@ -849,7 +854,7 @@ function Session({
             }}
             className="cursor-pointer border-0 bg-transparent px-2.5 py-2 text-left font-mono text-xs text-signal hover:bg-deep"
           >
-            ⟳ Reboot
+            <Power aria-hidden className={ic} /> Reboot
           </button>
         </div>
       )}
@@ -1018,7 +1023,7 @@ function Window({
         <span className="size-2" style={{ background: border }} />
         <h2 className="m-0 flex-1 overflow-hidden text-xs font-medium whitespace-nowrap">{title}</h2>
         <button type="button" aria-label="Minimise" onClick={(e) => (e.stopPropagation(), onMin())} className={`${btn} hover:bg-teal`}>
-          –
+          <Minus aria-hidden className={ic} />
         </button>
         <button
           ref={maxRef}
@@ -1037,10 +1042,10 @@ function Window({
           }}
           className={`${btn} hover:bg-teal`}
         >
-          {docked ? '❐' : '□'}
+          {docked ? <Copy aria-hidden className={ic} /> : <Square aria-hidden className={ic} />}
         </button>
         <button type="button" aria-label="Close" onClick={(e) => (e.stopPropagation(), onClose())} className={`${btn} hover:border-signal hover:bg-signal hover:text-ink`}>
-          ×
+          <X aria-hidden className={ic} />
         </button>
       </div>
       {children}
@@ -1118,7 +1123,7 @@ function MailApp() {
       <div className="flex items-center gap-2.5 border-t border-deep px-3.5 py-2.5">
         <span className="text-dim">replies within a day or two</span>
         <button type="submit" className="ml-auto cursor-pointer border-0 bg-amber px-[18px] py-[9px] font-mono text-xs font-bold text-ink hover:bg-signal">
-          Send ⏎
+          Send <CornerDownLeft aria-hidden className={ic} />
         </button>
       </div>
     </form>

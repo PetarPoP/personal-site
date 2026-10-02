@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { photoCategories, profile, toneColor } from '#/data/portfolio'
+import { ArrowUpRight, ChevronLeft, ChevronRight, Download, Star } from 'lucide-react'
+import { profile, toneColor } from '#/data/portfolio'
 import type { Repo } from '#/lib/github'
-import type { PhotoCategory } from '#/data/portfolio'
 import type { Folder, WindowId } from '#/lib/os'
 import { useNotes } from '#/lib/useNotes'
 import { usePhotos, usePreload } from '#/lib/usePhotos'
@@ -10,7 +10,7 @@ import { repoDate, useRepos } from '#/lib/useRepos'
 import { useCvPicker } from './CvPicker'
 import { NotesFolder } from './Notes'
 import type { OpenMenu } from './Notes'
-import { Shot } from './shared'
+import { Shot, ic } from './shared'
 
 // The desktop Files window: one explorer whose sidebar switches between
 // ~/projects, ~/photos and ~/notes in place.
@@ -25,17 +25,16 @@ export function FilesWindow({
   openWin: (id: WindowId) => void
   openMenu: OpenMenu
 }) {
-  const [photoFilter, setPhotoFilter] = useState<'All' | PhotoCategory>('All')
   const notes = useNotes(false)
   const gallery = usePhotos(folder === 'photos')
   const repos = useRepos(folder === 'projects')
-  const shown = gallery.frames.filter((p) => gallery.live || photoFilter === 'All' || p.category === photoFilter)
+  const shown = gallery.frames
   const count = folder === 'projects' ? repos.repos.length : folder === 'photos' ? shown.length : notes.notes.length
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[180px_minmax(0,1fr)]">
       <Places folder={folder} setFolder={setFolder} count={count} openWin={openWin} />
       {folder === 'projects' && <ProjectsFolder {...repos} />}
-      {folder === 'photos' && <PhotosFolder gallery={gallery} list={shown} filter={photoFilter} setFilter={setPhotoFilter} />}
+      {folder === 'photos' && <PhotosFolder gallery={gallery} list={shown} />}
       {folder === 'notes' && <NotesFolder openMenu={openMenu} />}
     </div>
   )
@@ -60,17 +59,21 @@ function Places({
       <div className="px-2 pb-2 text-[10px] tracking-[0.1em] text-dim">PLACES</div>
       {(['projects', 'photos', 'notes'] as const).map((f) => (
         <button key={f} type="button" aria-current={f === folder ? 'page' : undefined} className={f === folder ? here : item} onClick={() => setFolder(f)}>
-          {f === folder ? `▸ ~/${f}` : `  ~/${f}`}
+          {/* Two characters wide, like the indent of the other places. */}
+          {f === folder ? <ChevronRight aria-hidden className="inline-block h-[1.15em] w-[2ch] align-[-0.2em]" /> : '  '}
+          {`~/${f}`}
         </button>
       ))}
       <button type="button" className={item} onClick={() => openWin('cv')}>
         {'  ~/docs/cv.pdf'}
       </button>
       <button type="button" className={item} onClick={openCv}>
-        {'  download cv ↓'}
+        {'  download cv '}
+        <Download aria-hidden className={ic} />
       </button>
       <a href={profile.github} target="_blank" rel="noreferrer" className={item}>
-        {'  github ↗'}
+        {'  github '}
+        <ArrowUpRight aria-hidden className={ic} />
       </a>
       <div className="mt-auto p-2 text-[11px] text-dim">{count} items</div>
     </nav>
@@ -93,7 +96,7 @@ function ProjectsFolder({ repos, loading, error }: { repos: Repo[]; loading: boo
           <p className="m-0 text-xs text-dim">
             {error}{' '}
             <a href={profile.github} target="_blank" rel="noreferrer" className="text-amber">
-              {profile.githubLabel} ↗
+              {profile.githubLabel} <ArrowUpRight aria-hidden className={ic} />
             </a>
           </p>
         )}
@@ -130,12 +133,16 @@ function ProjectsFolder({ repos, loading, error }: { repos: Repo[]; loading: boo
             <div className="font-sans text-2xl leading-[1.05] font-extrabold tracking-[-0.02em] break-words">{r.name}</div>
             <div className="flex gap-3 text-[11px] text-amber uppercase">
               {r.language && <span>{r.language}</span>}
-              {r.stars > 0 && <span>★ {r.stars}</span>}
+              {r.stars > 0 && (
+                <span>
+                  <Star aria-hidden className={ic} /> {r.stars}
+                </span>
+              )}
               <span className="text-dim">{repoDate(r.created)}</span>
             </div>
             {r.desc && <p className="m-0 font-sans text-sm leading-[1.45] text-muted">{r.desc}</p>}
             <a href={r.url} target="_blank" rel="noreferrer" className="mt-auto bg-amber p-2.5 text-center text-xs font-bold text-ink no-underline hover:bg-signal">
-              Open on GitHub ↗
+              Open on GitHub <ArrowUpRight aria-hidden className={ic} />
             </a>
           </>
         )}
@@ -147,41 +154,19 @@ function ProjectsFolder({ repos, loading, error }: { repos: Repo[]; loading: boo
 function PhotosFolder({
   gallery,
   list,
-  filter,
-  setFilter,
 }: {
   gallery: ReturnType<typeof usePhotos>
   list: Frame[]
-  filter: 'All' | PhotoCategory
-  setFilter: (f: 'All' | PhotoCategory) => void
 }) {
   const [viewer, setViewer] = useState<string | null>(null)
   const at = list.findIndex((p) => p.key === viewer)
   const step = (dir: number) => setViewer(list[(at + dir + list.length) % list.length].key)
   const cur = at >= 0 ? list[at] : null
   usePreload(cur ? [list[(at + 1) % list.length]?.full, list[(at - 1 + list.length) % list.length]?.full] : [])
-  // Real photos have no categories, so every one gets a size from its shape.
-  const all = gallery.live || filter === 'All'
   return (
     <div className="relative flex min-h-0 flex-col">
-      <div role={gallery.live ? undefined : 'tablist'} aria-label="Filter photos" className="flex min-h-[47px] items-center gap-1.5 border-b border-deep px-3 py-2.5">
-        {!gallery.live &&
-          photoCategories.map((c) => (
-            <button
-              key={c}
-              role="tab"
-              type="button"
-              aria-selected={c === filter}
-              onClick={() => {
-                setFilter(c)
-                setViewer(null)
-              }}
-              className={`cursor-pointer border px-2.5 py-1.5 font-mono text-[11px] font-medium ${c === filter ? 'border-amber bg-amber text-ink' : 'border-teal bg-transparent text-paper'}`}
-            >
-              {c}
-            </button>
-          ))}
-        {gallery.live && !gallery.loading && !gallery.error && <span className="text-[11px] text-muted">{list.length} frames</span>}
+      <div className="flex min-h-[47px] items-center gap-1.5 border-b border-deep px-3 py-2.5">
+        {!gallery.loading && !gallery.error && <span className="text-[11px] text-muted">{list.length} frames</span>}
         <span className="ml-auto text-[11px] text-dim">~/photos</span>
       </div>
       {gallery.loading && <p className="m-0 p-4 text-xs text-dim">developing film…</p>}
@@ -194,7 +179,7 @@ function PhotosFolder({
       {gallery.live && !gallery.loading && !gallery.error && !list.length && <p className="m-0 p-4 text-xs text-dim">The album is empty.</p>}
       <ul className="thin-scroll m-0 grid flex-1 grid-flow-dense list-none grid-cols-6 content-start gap-2 overflow-auto p-3">
         {list.map((p) => (
-          <li key={p.key} style={{ gridColumn: `span ${all ? p.span : 3}` }}>
+          <li key={p.key} style={{ gridColumn: `span ${p.span}` }}>
             <button type="button" onClick={() => setViewer(p.key)} className="block w-full cursor-zoom-in border border-deep p-0 hover:border-amber" aria-label={`Open ${p.caption}`}>
               <Shot
                 src={p.src}
@@ -202,7 +187,7 @@ function PhotosFolder({
                 alt={p.caption}
                 label={`${p.code} · ${p.caption}`}
                 className="w-full p-2"
-                style={{ height: all ? p.height : 210 }}
+                style={{ height: p.height }}
                 labelClassName="bg-ink px-1.5 py-0.5 text-[10px] font-medium text-paper"
                 keepLabel
               />
@@ -237,10 +222,10 @@ function PhotosFolder({
             <span>{cur.caption}</span>
             {cur.meta && <span className="text-dim">· {cur.meta}</span>}
             <button type="button" aria-label="Previous" onClick={() => step(-1)} className="ml-auto h-[30px] w-[34px] cursor-pointer border border-teal bg-transparent text-paper hover:border-amber">
-              ‹
+              <ChevronLeft aria-hidden className={ic} />
             </button>
             <button type="button" aria-label="Next" onClick={() => step(1)} className="h-[30px] w-[34px] cursor-pointer border border-teal bg-transparent text-paper hover:border-amber">
-              ›
+              <ChevronRight aria-hidden className={ic} />
             </button>
             <button
               type="button"
