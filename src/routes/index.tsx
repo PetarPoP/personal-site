@@ -29,7 +29,7 @@ function Home() {
   const syncUrl = useCallback(
     // push adds a history entry, so the phone's back button closes the app.
     (id: AppId | null, push = false) => {
-      const slug = id && id !== "term" ? apps[id].slug : undefined;
+      const slug = id ? apps[id].slug : undefined;
       navigate({
         search: slug ? { app: slug } : {},
         replace: !push,

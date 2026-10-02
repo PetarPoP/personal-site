@@ -30,9 +30,25 @@ export const appFromSlug = (slug?: string): AppId | undefined =>
 export const stripes = (color: string) =>
   `repeating-linear-gradient(135deg, ${color} 0 1px, #0d1b1c 1px 10px)`
 
+const tz = 'Europe/Sarajevo'
+
+// ---- Battery ------------------------------------------------------------------
+
+// The phone's battery follows Petar's day in Livno: full at 8:00, down to 1% at 20:00, then
+// charging back overnight.
+export const battery = (now: number) => {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(now)
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0)
+  const minutes = get('hour') * 60 + get('minute')
+  const half = 12 * 60
+  const sinceEight = (minutes - 8 * 60 + 24 * 60) % (24 * 60)
+  const charging = sinceEight >= half
+  const t = (charging ? sinceEight - half : sinceEight) / half
+  return { pct: Math.round(charging ? 1 + 99 * t : 100 - 99 * t), charging }
+}
+
 // ---- Clock ----------------------------------------------------------------
 
-const tz = 'Europe/Sarajevo'
 export const formatClock = (now: number) => {
   const d = new Date(now)
   return {
