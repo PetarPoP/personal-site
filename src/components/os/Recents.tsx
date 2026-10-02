@@ -31,7 +31,12 @@ export function Recents({
   useEffect(() => {
     if (!open) return
     setScreen({ w: window.innerWidth, h: window.innerHeight })
-    if (strip.current) strip.current.scrollLeft = strip.current.scrollWidth
+    // Always start at the newest app, wherever the strip was left last time. After the frame,
+    // so the browser's scroll snapping doesn't put it back on the card it was snapped to.
+    const end = () => strip.current?.scrollTo({ left: strip.current.scrollWidth, behavior: 'instant' })
+    end()
+    const f = requestAnimationFrame(end)
+    return () => cancelAnimationFrame(f)
   }, [open])
   const scale = Math.min(0.72, (screen.h - 250) / screen.h, 340 / screen.w)
   return (
