@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { bootLog, photoCategories, profile, projects, toneColor } from '#/data/portfolio'
 import type { PhotoCategory } from '#/data/portfolio'
-import { appFromSlug, apps, formatClock, stripes } from '#/lib/os'
+import { appFromSlug, apps, battery, formatClock, stripes } from '#/lib/os'
 import type { AppId } from '#/lib/os'
 import { blinkOn, dropBackLayers, markBooted, popBackLayer, useBackLayer, shouldSkipBoot, useNow, useTerminal } from '#/lib/hooks'
 import { useCvPicker } from './CvPicker'
 import { CvDocument, CvLangSwitch, HudCorners, LogoBox, MailSent, ProgressBar, Shot, Wordmark, useMailto } from './shared'
 import type { CvLang } from './shared'
 import { PhotoSwipe } from './PhotoSwipe'
+import { Recents } from './Recents'
 import type { SwipeHandle } from './PhotoSwipe'
 import { SpotifyPlayer } from './Spotify'
 import { toast } from './Toaster'
@@ -44,6 +45,13 @@ export function Mobile({
   const [app, setApp] = useState<AppId>('work')
   const [appOpen, setAppOpen] = useState(false)
   const [cvLang, setCvLang] = useState<CvLang>('EN')
+  // The note open inside Notes ('new' while writing one); the top bar then goes back to the list.
+  const [noteOpen, setNoteOpen] = useState<string | 'new' | null>(null)
+  // Recent apps, newest first, and the recents screen opened from the gesture bar.
+  const [recents, setRecents] = useState<AppId[]>([])
+  const [recentsOpen, setRecentsOpen] = useState(false)
+  // What to do once the recents screen's history entry is gone: open an app or go home.
+  const afterRecents = useRef<AppId | 'home' | null>(null)
   const timer = useRef<ReturnType<typeof setInterval>>(undefined)
 
   // Opening an app from the home screen adds a history entry, so the phone's back button
@@ -64,7 +72,13 @@ export function Mobile({
   useEffect(() => {
     if (!enabled) return
     const onPop = () => {
-      if (popBackLayer()) return
+      if (popBackLayer()) {
+        const next = afterRecents.current
+        afterRecents.current = null
+        if (next === 'home') backRef.current()
+        else if (next) openRef.current(next)
+        return
+      }
       if (stacked.current) {
         stacked.current = false
         setAppOpen(false)
@@ -91,6 +105,8 @@ export function Mobile({
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         setAppOpen(false)
+        setRecents([])
+        setNoteOpen(null)
         resetSession.current()
       }),
     )
@@ -115,7 +131,11 @@ export function Mobile({
     }
     setApp(id)
     setAppOpen(true)
+    setRecents((r) => [id, ...r.filter((x) => x !== id)])
   }, [])
+
+  const openRef = useRef(openApp)
+  openRef.current = openApp
 
   const started = useRef(false)
   useEffect(() => {
@@ -142,7 +162,32 @@ export function Mobile({
     }
     setAppOpen(false)
   }, [])
+  const backRef = useRef(back)
+  backRef.current = back
   const term = useTerminal({ onOpen: openApp, onReboot: boot, onExit: back })
+
+  // The phone's back button closes the recents screen first.
+  useBackLayer(recentsOpen, () => setRecentsOpen(false))
+  const pickRecent = (id: AppId) => {
+    afterRecents.current = id
+    setRecentsOpen(false)
+  }
+  const removeRecent = (id: AppId) => {
+    const left = recents.filter((x) => x !== id)
+    setRecents(left)
+    // Closing the app that's open underneath goes home once recents close.
+    if (id === app && appOpen) afterRecents.current = 'home'
+    if (!left.length) setRecentsOpen(false)
+  }
+  const clearRecents = () => {
+    if (appOpen) afterRecents.current = 'home'
+    setRecents([])
+    setRecentsOpen(false)
+  }
+
+  // Gesture bar: tap for home, drag up for recent apps.
+  const bar = useRef<{ y: number; id: number; opened: boolean } | null>(null)
+  const battery_ = now === null ? null : battery(now)
   resetSession.current = term.reset
 
   // Lock screen: tap or swipe up.
@@ -239,10 +284,21 @@ export function Mobile({
         style={{ transform: appOpen ? 'none' : 'translateY(104%)' }}
       >
         <div className="mt-9 flex h-14 flex-none items-center gap-1.5 border-b border-deep px-2.5">
-          <button type="button" aria-label="Back" onClick={back} className="size-11 cursor-pointer border-0 bg-transparent text-xl text-paper">
-            ←
-          </button>
-          <h2 className="m-0 flex-1 font-sans text-[22px] font-extrabold tracking-[-0.02em]">{apps[app].label}</h2>
+          {app === 'notes' && noteOpen ? (
+            <>
+              <button type="button" aria-label="All notes" onClick={() => setNoteOpen(null)} className="size-11 cursor-pointer border-0 bg-transparent text-xl text-paper">
+                ←
+              </button>
+              <h2 className="m-0 flex-1 font-sans text-[22px] font-extrabold tracking-[-0.02em]">All notes</h2>
+            </>
+          ) : (
+            <>
+              <button type="button" aria-label="Back" onClick={back} className="size-11 cursor-pointer border-0 bg-transparent text-xl text-paper">
+                ←
+              </button>
+              <h2 className="m-0 flex-1 font-sans text-[22px] font-extrabold tracking-[-0.02em]">{apps[app].label}</h2>
+            </>
+          )}
           <span className="pr-2 text-[11px] text-dim">{subtitle[app]}</span>
         </div>
         <div ref={app === 'term' ? term.scrollRef : undefined} className="thin-scroll relative min-h-0 flex-1 overflow-auto">
@@ -263,7 +319,7 @@ export function Mobile({
             </div>
           )}
           {app === 'about' && <AboutApp />}
-          {app === 'notes' && <NotesApp />}
+          {app === 'notes' && <NotesApp open={noteOpen} setOpen={setNoteOpen} />}
           {app === 'spotify' && <SpotifyPlayer active={appOpen && phase === 'home'} compact />}
         </div>
         {app === 'term' && (
@@ -339,7 +395,9 @@ export function Mobile({
       {/* Status bar */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-50 flex h-9 items-center justify-between px-6 text-xs font-medium">
         <span>{clock?.hm}</span>
-        <span>5G ▂▄▆ 87%</span>
+        <span>
+          5G ▂▄▆ {battery_ ? `${battery_.charging ? '⚡' : ''}${battery_.pct}%` : ''}
+        </span>
       </div>
 
       {/* Boot */}
@@ -371,12 +429,36 @@ export function Mobile({
         </div>
       </div>
 
-      {/* Gesture bar: home / unlock */}
+      <Recents
+        open={recentsOpen}
+        list={recents}
+        subtitle={subtitle}
+        onPick={pickRecent}
+        onRemove={removeRecent}
+        onClear={clearRecents}
+        onClose={() => setRecentsOpen(false)}
+      />
+
+      {/* Gesture bar: tap for home / unlock, drag up for recent apps */}
       <button
         type="button"
         aria-label="Home"
-        onClick={() => (phase === 'lock' ? unlock() : back())}
-        className="absolute bottom-0 left-1/2 z-[70] -ml-[90px] flex h-6 w-[180px] cursor-pointer items-center justify-center border-0 bg-transparent"
+        onPointerDown={(e) => (bar.current = { y: e.clientY, id: e.pointerId, opened: false })}
+        onPointerMove={(e) => {
+          const b = bar.current
+          if (!b || b.id !== e.pointerId || b.opened || b.y - e.clientY < 30) return
+          b.opened = true
+          if (phase === 'lock') unlock()
+          else if (phase === 'home') setRecentsOpen(true)
+        }}
+        onPointerUp={() => setTimeout(() => (bar.current = null))}
+        onClick={() => {
+          if (bar.current?.opened) return
+          if (phase === 'lock') unlock()
+          else if (recentsOpen) setRecentsOpen(false)
+          else back()
+        }}
+        className="absolute bottom-0 left-1/2 z-[70] -ml-[90px] flex h-8 w-[180px] touch-none cursor-pointer items-end justify-center border-0 bg-transparent pb-2"
       >
         <span className="h-1 w-[120px] rounded-sm bg-paper" />
       </button>
@@ -567,9 +649,10 @@ function AboutApp() {
   )
 }
 
-function NotesApp() {
+function NotesApp({ open, setOpen }: { open: string | 'new' | null; setOpen: (v: string | 'new' | null) => void }) {
   const { status, notes, mineLeft, admin, remove } = useNotes()
-  const [open, setOpen] = useState<string | 'new' | null>(null)
+  // The phone's back button goes back to the list first.
+  useBackLayer(open !== null, () => setOpen(null))
   const [confirm, setConfirm] = useState<Note | null>(null)
   const [error, setError] = useState<string | null>(null)
   const current = open && open !== 'new' ? notes.find((n) => n.id === open) : undefined
@@ -587,9 +670,6 @@ function NotesApp() {
   if (open === 'new' || current) {
     return (
       <div className="flex min-h-full flex-col gap-3 p-4">
-        <button type="button" onClick={() => setOpen(null)} className="cursor-pointer self-start border-0 bg-transparent p-0 font-mono text-xs text-dim">
-          ← all notes
-        </button>
         <h3 className="m-0 truncate font-sans text-2xl font-extrabold">{current ? current.name : 'New note'}</h3>
         {open === 'new' ? (
           <NoteEditor compact onSaved={(n) => setOpen(n.id)} onCancel={() => setOpen(null)} />
