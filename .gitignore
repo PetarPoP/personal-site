@@ -12,3 +12,6 @@ dist
 dist-ssr
 node_modules
 todos.json
+
+# Local Worker secrets (wrangler)
+.dev.vars*

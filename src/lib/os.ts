@@ -22,7 +22,7 @@ export const apps: Record<
 export const folderApp: Record<Folder, AppId> = { projects: 'work', photos: 'photos', notes: 'notes' }
 export const appFolder: Partial<Record<AppId, Folder>> = { work: 'projects', photos: 'photos', notes: 'notes' }
 
-// ?app=<slug> deep links open the matching window or app.
+// /<slug> addresses open the matching window or app.
 export const appSlugs = Object.values(apps).map((a) => a.slug)
 export const appFromSlug = (slug?: string): AppId | undefined =>
   (Object.keys(apps) as AppId[]).find((id) => apps[id].slug === slug)

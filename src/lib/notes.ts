@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { getRequestIP } from '@tanstack/react-start/server'
+import { getRequestHeader, getRequestIP } from '@tanstack/react-start/server'
 import { Redis } from '@upstash/redis'
 
 // Guest notes in ~/notes: anyone can read them; each browser can keep up to
@@ -50,7 +50,8 @@ async function sha256(value: string) {
 }
 
 async function identity(owner: string, admin?: string) {
-  const ip = getRequestIP({ xForwardedFor: true }) ?? 'unknown'
+  // Cloudflare puts the visitor's address in CF-Connecting-IP.
+  const ip = getRequestHeader('cf-connecting-ip') ?? getRequestIP({ xForwardedFor: true }) ?? 'unknown'
   const adminKey = process.env.NOTES_ADMIN_KEY
   return {
     owner: await sha256(`owner:${owner}`),

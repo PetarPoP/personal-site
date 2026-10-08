@@ -14,20 +14,28 @@ export const Route = createFileRoute('/api/photos/$id')({
         if (!UUID.test(params.id)) return new Response('Not a photo', { status: 400 })
         const size = new URL(request.url).searchParams.get('size') === 'preview' ? 'preview' : 'thumbnail'
 
+        // Cloudflare's cache in front of Petar's server: Worker responses aren't cached on their own.
+        const edge = typeof caches === 'undefined' ? null : (caches as unknown as { default: Cache }).default
+        const key = new Request(new URL(`/api/photos/${params.id}?size=${size}`, request.url))
+        const hit = await edge?.match(key)
+        if (hit) return hit
+
         const res = await fetch(`${share.origin}/api/assets/${params.id}/thumbnail?size=${size}&${share.auth}`, {
           headers: { ...immichHeaders, Accept: 'image/*' },
         })
         if (!res.ok || !res.body) return new Response('Photo unavailable', { status: res.status === 404 ? 404 : 502, headers: { 'Cache-Control': 'no-store' } })
 
-        return new Response(res.body, {
+        const photo = new Response(res.body, {
           headers: {
             'Content-Type': res.headers.get('Content-Type') ?? 'image/jpeg',
-            // A photo never changes under its id: browsers keep it for a week and Vercel's edge for
-            // a month, so Petar's server is asked about each photo rarely. Nothing is stored beyond
-            // these caches.
+            // A photo never changes under its id: browsers keep it for a week and Cloudflare's
+            // cache for a month, so Petar's server is asked about each photo rarely. Nothing is
+            // stored beyond these caches.
             'Cache-Control': 'public, max-age=604800, s-maxage=2592000, stale-while-revalidate=604800',
           },
         })
+        if (edge) await edge.put(key, photo.clone())
+        return photo
       },
     },
   },

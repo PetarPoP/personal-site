@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /_serverFn/
+Disallow: /api/
+
+Sitemap: https://petarpopovic.com/sitemap.xml

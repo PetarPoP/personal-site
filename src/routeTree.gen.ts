@@ -9,13 +9,24 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as OsRouteImport } from './routes/_os'
+import { Route as OsIndexRouteImport } from './routes/_os/index'
+import { Route as OsAppRouteImport } from './routes/_os/$app'
 import { Route as ApiPhotosIdRouteImport } from './routes/api/photos.$id'
 
-const IndexRoute = IndexRouteImport.update({
+const OsRoute = OsRouteImport.update({
+  id: '/_os',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OsIndexRoute = OsIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => OsRoute,
+} as any)
+const OsAppRoute = OsAppRouteImport.update({
+  id: '/$app',
+  path: '/$app',
+  getParentRoute: () => OsRoute,
 } as any)
 const ApiPhotosIdRoute = ApiPhotosIdRouteImport.update({
   id: '/api/photos/$id',
@@ -24,39 +35,57 @@ const ApiPhotosIdRoute = ApiPhotosIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof OsIndexRoute
+  '/$app': typeof OsAppRoute
   '/api/photos/$id': typeof ApiPhotosIdRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/$app': typeof OsAppRoute
+  '/': typeof OsIndexRoute
   '/api/photos/$id': typeof ApiPhotosIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_os': typeof OsRouteWithChildren
+  '/_os/$app': typeof OsAppRoute
+  '/_os/': typeof OsIndexRoute
   '/api/photos/$id': typeof ApiPhotosIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/photos/$id'
+  fullPaths: '/' | '/$app' | '/api/photos/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/photos/$id'
-  id: '__root__' | '/' | '/api/photos/$id'
+  to: '/$app' | '/' | '/api/photos/$id'
+  id: '__root__' | '/_os' | '/_os/$app' | '/_os/' | '/api/photos/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  OsRoute: typeof OsRouteWithChildren
   ApiPhotosIdRoute: typeof ApiPhotosIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_os': {
+      id: '/_os'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof OsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_os/': {
+      id: '/_os/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof OsIndexRouteImport
+      parentRoute: typeof OsRoute
+    }
+    '/_os/$app': {
+      id: '/_os/$app'
+      path: '/$app'
+      fullPath: '/$app'
+      preLoaderRoute: typeof OsAppRouteImport
+      parentRoute: typeof OsRoute
     }
     '/api/photos/$id': {
       id: '/api/photos/$id'
@@ -68,8 +97,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface OsRouteChildren {
+  OsAppRoute: typeof OsAppRoute
+  OsIndexRoute: typeof OsIndexRoute
+}
+
+const OsRouteChildren: OsRouteChildren = {
+  OsAppRoute: OsAppRoute,
+  OsIndexRoute: OsIndexRoute,
+}
+
+const OsRouteWithChildren = OsRoute._addFileChildren(OsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  OsRoute: OsRouteWithChildren,
   ApiPhotosIdRoute: ApiPhotosIdRoute,
 }
 export const routeTree = rootRouteImport

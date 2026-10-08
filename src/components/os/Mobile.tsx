@@ -89,7 +89,7 @@ export function Mobile({
         return
       }
       // Forward again after going back: reopen the app in the URL.
-      const id = appFromSlug(new URLSearchParams(window.location.search).get('app') ?? undefined)
+      const id = appFromSlug(window.location.pathname.split('/')[1] || undefined)
       if (id) {
         stacked.current = true
         setApp(id)
@@ -334,7 +334,7 @@ export function Mobile({
             return (
               <a
                 key={id}
-                href={id === 'github' ? profile.github : `/?app=${a.slug}`}
+                href={id === 'github' ? profile.github : `/${a.slug}`}
                 target={id === 'github' ? '_blank' : undefined}
                 rel={id === 'github' ? 'noreferrer' : undefined}
                 onClick={(e) => {
