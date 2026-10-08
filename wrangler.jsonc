@@ -8,5 +8,7 @@
     // Prerendered pages are files like projects.html: serve /projects from it directly.
     "html_handling": "drop-trailing-slash"
   },
+  // Guest notes and the saved Spotify token (src/lib/db.ts).
+  "d1_databases": [{ "binding": "DB", "database_name": "personal-site", "database_id": "f0e35f3a-97ca-416f-8cfe-3dec4a56d82b" }],
   "observability": { "enabled": true }
 }

@@ -207,8 +207,10 @@ export function Desktop({
   useEffect(() => {
     if (enabled === null || started.current) return
     started.current = true
-    if (enabled && !initialApp && !shouldSkipBoot()) runBoot()
-    else finishBoot(enabled)
+    // On a phone the desktop stays hidden and must not count as booted, or the phone skips its boot.
+    if (!enabled) setPhase('desk')
+    else if (!initialApp && !shouldSkipBoot()) runBoot()
+    else finishBoot()
   }, [enabled, initialApp, runBoot, finishBoot])
   useEffect(
     () => () => {
