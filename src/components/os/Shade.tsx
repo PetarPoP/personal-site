@@ -55,6 +55,18 @@ export const quickDefaults: Quick = {
   brightness: 1,
 }
 
+// The battery icon for a level from battery() in os.ts; the desktop's top bar uses it too.
+export const batteryIcon = (battery: { pct: number; charging: boolean } | null): Icon =>
+  !battery
+    ? Battery
+    : battery.charging
+      ? BatteryCharging
+      : battery.pct > 70
+        ? BatteryFull
+        : battery.pct > 35
+          ? BatteryMedium
+          : BatteryLow
+
 // The status bar along the top of the phone: pull it down for the shade.
 export function StatusBar({
   time,
@@ -67,15 +79,7 @@ export function StatusBar({
   quick: Quick
   onPull: (e: PointerEvent<HTMLElement>) => void
 }) {
-  const BatteryIcon: Icon = !battery
-    ? Battery
-    : battery.charging
-      ? BatteryCharging
-      : battery.pct > 70
-        ? BatteryFull
-        : battery.pct > 35
-          ? BatteryMedium
-          : BatteryLow
+  const BatteryIcon = batteryIcon(battery)
   const icon = 'size-[14px]'
   return (
     <div

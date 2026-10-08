@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpRight, BatteryMedium, ChevronRight, Copy, CornerDownLeft, Download, Minus, Power, RefreshCw, Square, Wifi, X } from 'lucide-react'
+import { ArrowUpRight, ChevronRight, Copy, CornerDownLeft, Download, Minus, Power, RefreshCw, Square, Wifi, X } from 'lucide-react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { bootLog, profile } from '#/data/portfolio'
-import { appFolder, apps, folderApp, formatClock, windowIds } from '#/lib/os'
+import { appFolder, apps, battery, folderApp, formatClock, windowIds } from '#/lib/os'
 import type { AppId, Folder, WindowId } from '#/lib/os'
 import { blinkOn, markBooted, shouldSkipBoot, useNow, useTerminal } from '#/lib/hooks'
 import { useCvPicker } from './CvPicker'
 import { ContextMenu } from './ContextMenu'
 import type { MenuItem, MenuState } from './ContextMenu'
 import { FilesWindow } from './Files'
+import { batteryIcon } from './Shade'
 import { CvDocument, CvLangSwitch, HudCorners, LogoBox, MailSent, ProgressBar, Wordmark, ic, useMailto } from './shared'
 import type { CvLang } from './shared'
 import { SpotifyPlayer } from './Spotify'
@@ -322,6 +323,9 @@ function Session({
 }) {
   const now = useNow()
   const clock = now === null ? null : formatClock(now)
+  // The same battery as the phone: drains through the day, charges overnight.
+  const power = now === null ? null : battery(now)
+  const BatteryIcon = batteryIcon(power)
   const blink = blinkOn(now)
   const openCv = useCvPicker()
 
@@ -803,7 +807,7 @@ function Session({
           <Wifi aria-hidden className={ic} /> wifi
         </span>
         <span className="text-muted">
-          <BatteryMedium aria-hidden className={ic} /> 87%
+          <BatteryIcon aria-hidden className={ic} /> {power ? `${power.pct}%` : ''}
         </span>
         <span className="whitespace-pre">{clock ? `${clock.day}  ${clock.hm}` : ''}</span>
       </header>
@@ -902,7 +906,7 @@ function DesktopIcon({
 }) {
   return (
     <a
-      href={`/?app=${apps[id].slug}`}
+      href={`/${apps[id].slug}`}
       aria-current={selected || undefined}
       onPointerDown={onPointerDown}
       onClick={(e) => {

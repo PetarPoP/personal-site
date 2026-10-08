@@ -1,20 +1,31 @@
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 
 import appCss from '../styles.css?url'
-
-const description =
-  'Petar Popović — computer science student, web developer (Next.js, React) and photographer from Livno, BiH.'
+import { personJsonLd, site } from '#/lib/seo'
 
 export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Petar Popović — Developer & Photographer' },
-      { name: 'description', content: description },
+      { title: site.title },
+      { name: 'description', content: site.description },
+      { name: 'author', content: 'Petar Popović' },
       { name: 'theme-color', content: '#0d1b1c' },
-      { property: 'og:title', content: 'Petar Popović — Developer & Photographer' },
-      { property: 'og:description', content: description },
+      // Link previews (the pages under /<app> override title, description and url).
+      { property: 'og:type', content: 'website' },
+      { property: 'og:site_name', content: 'Petar Popović' },
+      { property: 'og:locale', content: 'en_US' },
+      { property: 'og:title', content: site.title },
+      { property: 'og:description', content: site.description },
+      { property: 'og:image', content: site.image },
+      { property: 'og:image:width', content: '1200' },
+      { property: 'og:image:height', content: '630' },
+      { property: 'og:image:alt', content: 'POP/OS, the site of Petar Popović' },
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:title', content: site.title },
+      { name: 'twitter:description', content: site.description },
+      { name: 'twitter:image', content: site.image },
     ],
     links: [
       { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
@@ -28,6 +39,7 @@ export const Route = createRootRoute({
       },
       { rel: 'stylesheet', href: appCss },
     ],
+    scripts: [{ type: 'application/ld+json', children: JSON.stringify(personJsonLd) }],
   }),
   shellComponent: RootDocument,
 })

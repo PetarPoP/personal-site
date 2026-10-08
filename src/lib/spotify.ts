@@ -21,7 +21,7 @@ export type NowPlaying =
 // A Spotify answer we can explain to the site owner (shown in the app and in the server log).
 class SpotifyError extends Error {}
 
-// Values pasted into the Vercel dashboard sometimes keep quotes or spaces.
+// Values pasted into a dashboard sometimes keep quotes or spaces.
 const env = (name: string) => process.env[name]?.trim().replace(/^(['"])(.*)\1$/, '$2').trim() || undefined
 
 async function failure(res: Response, what: string) {
@@ -39,7 +39,7 @@ let token: { value: string; expires: number } | null = null
 
 // Spotify can hand out a new refresh token when the old one is used; the newest one is kept in
 // Upstash (or memory) so the site keeps working. It is tied to the SPOTIFY_REFRESH_TOKEN it grew
-// from, so putting a new token in Vercel replaces it.
+// from, so putting a new token in the secrets replaces it.
 const REFRESH_KEY = 'popos:spotify-refresh'
 type SavedRefresh = { from: string; token: string }
 let memoryRefresh: SavedRefresh | null = null

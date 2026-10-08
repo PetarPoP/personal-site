@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "personal-site",
+  "compatibility_date": "2026-10-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "assets": {
+    // Prerendered pages are files like projects.html: serve /projects from it directly.
+    "html_handling": "drop-trailing-slash"
+  },
+  "observability": { "enabled": true }
+}
