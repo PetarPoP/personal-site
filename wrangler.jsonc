@@ -14,5 +14,7 @@
   "previews": {
     "d1_databases": [{ "binding": "DB", "database_name": "personal-site-preview", "database_id": "9ecc25de-40ee-417f-b03a-6177050734b6" }]
   },
+  // Keep variables and secrets set in the Cloudflare dashboard when `wrangler deploy` runs.
+  "keep_vars": true,
   "observability": { "enabled": true }
 }
