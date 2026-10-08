@@ -49,7 +49,7 @@ const server = createServer(async (req, res) => {
   } else {
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Done. The refresh token is in your terminal; you can close this tab.')
     console.log(`\nSPOTIFY_REFRESH_TOKEN=${json.refresh_token}\n`)
-    console.log('Put it in Vercel → Settings → Environment Variables, then redeploy.')
+    console.log('Save it as the Worker secret: npx wrangler secret put SPOTIFY_REFRESH_TOKEN (or Cloudflare → Workers → personal-site → Settings → Variables and Secrets).')
   }
   server.close()
 })

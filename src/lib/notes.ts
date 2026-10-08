@@ -1,17 +1,16 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader, getRequestIP } from '@tanstack/react-start/server'
-import { Redis } from '@upstash/redis'
+import { db } from './db'
 
 // Guest notes in ~/notes: anyone can read them; each browser can keep up to
 // NOTE_LIMIT notes and edit or delete only its own. The site owner can delete
-// any note with NOTES_ADMIN_KEY. Stored in Upstash Redis as one hash.
+// any note with NOTES_ADMIN_KEY. Stored in Cloudflare D1 (src/lib/db.ts).
 
 export const NOTE_LIMIT = 3
 export const MAX_NAME = 40
 export const MAX_TEXT = 500
 export const MAX_SIG = 40
 const MAX_TOTAL = 300
-const KEY = 'popos:notes'
 
 export type Note = { id: string; name: string; text: string; sig: string; createdAt: number; updatedAt: number; mine: boolean }
 type Stored = Omit<Note, 'mine'> & { owner: string; ip: string }
@@ -20,28 +19,33 @@ export type NoteResult = { ok: true; note: Note } | { ok: false; error: string }
 
 type Store = { all: () => Promise<Stored[]>; put: (n: Stored) => Promise<unknown>; del: (id: string) => Promise<unknown> }
 
-const memory = new Map<string, Stored>()
+type Row = { id: string; name: string; text: string; sig: string; created_at: number; updated_at: number; owner: string; ip: string }
+const fromRow = (r: Row): Stored => ({
+  id: r.id,
+  name: r.name,
+  text: r.text,
+  sig: r.sig,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  owner: r.owner,
+  ip: r.ip,
+})
 
-function store(): Store | null {
-  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL
-  const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN
-  if (url && token) {
-    const redis = new Redis({ url, token })
-    return {
-      all: async () => Object.values((await redis.hgetall<Record<string, Stored>>(KEY)) ?? {}),
-      put: (n) => redis.hset(KEY, { [n.id]: n }),
-      del: (id) => redis.hdel(KEY, id),
-    }
+async function store(): Promise<Store | null> {
+  const d = await db()
+  if (!d) return null
+  return {
+    all: async () => (await d.prepare('SELECT * FROM notes').all<Row>()).results.map(fromRow),
+    put: (n) =>
+      d
+        .prepare(
+          `INSERT INTO notes (id, name, text, sig, created_at, updated_at, owner, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET name = excluded.name, text = excluded.text, sig = excluded.sig, updated_at = excluded.updated_at`,
+        )
+        .bind(n.id, n.name, n.text, n.sig, n.createdAt, n.updatedAt, n.owner, n.ip)
+        .run(),
+    del: (id) => d.prepare('DELETE FROM notes WHERE id = ?').bind(id).run(),
   }
-  // Local development without Upstash: keep notes in memory.
-  if (process.env.NODE_ENV !== 'production') {
-    return {
-      all: async () => [...memory.values()],
-      put: async (n) => memory.set(n.id, n),
-      del: async (id) => memory.delete(id),
-    }
-  }
-  return null
 }
 
 async function sha256(value: string) {
@@ -100,7 +104,7 @@ const authValidator = (d: unknown) => {
 export const listNotes = createServerFn({ method: 'POST' })
   .validator(authValidator)
   .handler(async ({ data }): Promise<NotesState> => {
-    const s = store()
+    const s = await store()
     if (!s) return { configured: false, notes: [], mineLeft: 0, admin: false }
     const me = await identity(data.owner, data.admin)
     const all = (await s.all()).sort(byDate)
@@ -120,7 +124,7 @@ export const saveNote = createServerFn({ method: 'POST' })
     }
   })
   .handler(async ({ data }): Promise<NoteResult> => {
-    const s = store()
+    const s = await store()
     if (!s) return { ok: false, error: 'Notes are not connected yet.' }
     if (!data.text.trim()) return { ok: false, error: 'Write something first.' }
     if (data.text.length > MAX_TEXT) return { ok: false, error: `Keep it under ${MAX_TEXT} characters.` }
@@ -151,7 +155,7 @@ export const saveNote = createServerFn({ method: 'POST' })
 export const deleteNote = createServerFn({ method: 'POST' })
   .validator((d: unknown) => ({ ...authValidator(d), id: String((d as Record<string, unknown>).id ?? '').slice(0, 64) }))
   .handler(async ({ data }): Promise<{ ok: boolean; error?: string }> => {
-    const s = store()
+    const s = await store()
     if (!s) return { ok: false, error: 'Notes are not connected yet.' }
     const me = await identity(data.owner, data.admin)
     const note = (await s.all()).find((n) => n.id === data.id)

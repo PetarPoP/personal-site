@@ -29,8 +29,11 @@ With the repo connected in Cloudflare → Workers & Pages (Workers Builds):
 
 - Build command: `npm run build`, deploy command: `npx wrangler deploy`.
 - Secrets go in the Worker's Settings → Variables and Secrets (or `npx wrangler secret put NAME`), never in the repo:
-  `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `NOTES_ADMIN_KEY`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`,
-  `SPOTIFY_REFRESH_TOKEN`, `IMMICH_SHARE_URL`, optional `GITHUB_TOKEN`.
+  `NOTES_ADMIN_KEY`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REFRESH_TOKEN`, `IMMICH_SHARE_URL`,
+  optional `GITHUB_TOKEN`.
+- Storage is the Cloudflare D1 database `personal-site`, bound as `DB` in `wrangler.jsonc` (`src/lib/db.ts`). Its tables
+  are created on first use. After changing bindings in `wrangler.jsonc`, run `npm run cf-typegen` to refresh
+  `worker-configuration.d.ts`.
 - Domains: add `petarpopovic.com` (and `www`) under the Worker's Settings → Domains & Routes → Custom domain. For
   `petarpop.com`, add the domain to Cloudflare and create a Redirect Rule (Rules → Redirect Rules, "Redirect from root to
   www"-style, static or dynamic) sending every request to `https://petarpopovic.com` with the same path, status 301.
@@ -66,15 +69,11 @@ The Mail app has no backend: "Send" opens the visitor's mail app with the messag
 ## Guest notes
 
 Visitors can leave `.txt` notes in `~/notes` (right-click the folder → New note). Everyone sees them; each browser can keep
-up to 3 and can edit, rename or delete only its own. Notes are stored in Upstash Redis:
+up to 3 and can edit, rename or delete only its own. Notes are stored in the D1 database (table `notes`); `npm run dev`
+and `npm run preview` use a local copy of it in `.wrangler/state`.
 
-1. Create a database at upstash.com (Redis) and add its REST URL and token as the Worker secrets `KV_REST_API_URL` and
-   `KV_REST_API_TOKEN` (the `UPSTASH_REDIS_REST_*` names work too).
-2. Optional: set `NOTES_ADMIN_KEY` to a long secret. Typing `admin <key>` in the terminal then lets that browser
-   delete any note (`admin logout` removes it).
-3. Redeploy (secrets apply to the next deployment).
-
-Without those variables, `npm run dev` keeps notes in memory, and production shows "Notes aren't connected yet."
+Optional: set `NOTES_ADMIN_KEY` to a long secret. Typing `admin <key>` in the terminal then lets that browser delete
+any note (`admin logout` removes it).
 
 ## Spotify
 
@@ -86,7 +85,7 @@ The Spotify app shows the song playing right now, or the last one played. Set th
   Spotify app, run `SPOTIFY_CLIENT_ID=… SPOTIFY_CLIENT_SECRET=… npm run spotify-token`, open the printed link and
   approve. The token is printed in the terminal.
 
-When Spotify hands out a newer refresh token, the site keeps it in Upstash, so the secret only needs replacing if
+When Spotify hands out a newer refresh token, the site keeps it in the D1 database (table `kv`), so the secret only needs replacing if
 Spotify says it was revoked (the Spotify app shows the reason).
 
 Spotify is asked at most every 15 seconds per Worker instance. Locally, `SPOTIFY_MOCK=1 npm run dev` shows a fixed song
