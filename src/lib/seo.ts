@@ -56,7 +56,7 @@ export const jsonLd = {
       alumniOf: timeline.filter((x) => x.school).map((x) => ({ '@type': 'EducationalOrganization', name: x.where })),
       knowsAbout: ['Embedded firmware', 'C', 'STM32', 'CAN bus', 'ESP32', 'React', 'Next.js', 'TypeScript', 'TanStack Start', 'Photography'],
       knowsLanguage: ['en', 'hr'],
-      sameAs: [profile.github],
+      sameAs: [profile.github, ...profile.profiles],
     },
     {
       '@type': 'ItemList',
