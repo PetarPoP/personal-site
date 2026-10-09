@@ -103,7 +103,7 @@ function Ticket({ track, playing, progress, playedAt }: { track: Track; playing:
       aria-label={`${track.title} by ${track.artists}, open in Spotify`}
       className="group grid w-full max-w-[920px] grid-cols-[clamp(56px,11vw,128px)_minmax(0,1fr)] text-deep no-underline drop-shadow-[0_18px_28px_rgba(17,48,46,.5)]"
     >
-      <div style={notch('right')} className="flex origin-bottom-right flex-col items-center justify-between rounded-l-[14px] border-r-[3px] border-dashed border-sand bg-deep py-6 text-sand transition-transform duration-500 ease-[cubic-bezier(.2,.9,.3,1.3)] group-hover:-translate-x-1.5 group-hover:-rotate-[5deg] motion-reduce:transition-none">
+      <div style={notch('right')} className="flex origin-bottom-right flex-col items-center justify-between rounded-l-[14px] border-r-[3px] border-dashed border-sand bg-deep py-6 text-sand transition-[translate,rotate] duration-700 ease-[cubic-bezier(.3,1.25,.4,1)] group-hover:-translate-x-1.5 group-hover:-rotate-[5deg] motion-reduce:transition-none">
         <span className={`${mono} text-[11px] max-sm:[writing-mode:vertical-rl]`}>Ticket</span>
         <span className="flex flex-col items-center gap-0.5">
           <span className={`${mono} text-xs text-mint`}>No.</span>
@@ -114,7 +114,7 @@ function Ticket({ track, playing, progress, playedAt }: { track: Track; playing:
 
       <div
         style={notch('left')}
-        className="grid origin-bottom-left grid-cols-[auto_minmax(0,1fr)_auto] items-center transition-transform duration-500 ease-[cubic-bezier(.2,.9,.3,1.3)] group-hover:translate-x-1 group-hover:rotate-[1deg] motion-reduce:transition-none gap-[clamp(16px,2.4vw,28px)] rounded-r-[14px] bg-sand py-[clamp(18px,2.4vw,26px)] pr-[clamp(16px,2.2vw,24px)] pl-[clamp(20px,2.6vw,28px)] max-md:grid-cols-[minmax(0,1fr)]"
+        className="grid origin-bottom-left grid-cols-[auto_minmax(0,1fr)_auto] items-center transition-[translate,rotate] duration-700 ease-[cubic-bezier(.3,1.25,.4,1)] group-hover:translate-x-1 group-hover:rotate-[1deg] motion-reduce:transition-none gap-[clamp(16px,2.4vw,28px)] rounded-r-[14px] bg-sand py-[clamp(18px,2.4vw,26px)] pr-[clamp(16px,2.2vw,24px)] pl-[clamp(20px,2.6vw,28px)] max-md:grid-cols-[minmax(0,1fr)]"
       >
         <Cover src={track.image} alt={`${track.album} cover`} />
 
