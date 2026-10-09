@@ -14,7 +14,11 @@ export const Route = createRootRoute({
       { name: 'robots', content: 'index, follow, max-image-preview:large, max-snippet:-1' },
       { name: 'theme-color', content: '#e9dfca' },
       // Link previews.
-      { property: 'og:type', content: 'website' },
+      // A personal page: Open Graph "profile" with the name split out.
+      { property: 'og:type', content: 'profile' },
+      { property: 'profile:first_name', content: 'Petar' },
+      { property: 'profile:last_name', content: 'Popović' },
+      { property: 'profile:username', content: 'PetarPoP' },
       { property: 'og:site_name', content: 'Petar Popović' },
       { property: 'og:locale', content: 'en_US' },
       { property: 'og:title', content: site.title },
