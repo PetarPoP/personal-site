@@ -92,7 +92,7 @@ const ticketNo = (url: string) => {
 
 const mono = 'font-mono uppercase tracking-[.1em]'
 
-// The song as a concert ticket: a deep-teal stub, then the dithered cover, the song, and a QR
+// The song as a concert ticket (the stub tears away a little on hover): a deep-teal stub, then the cover, the song, and a QR
 // code that opens it in Spotify.
 function Ticket({ track, playing, progress, playedAt }: { track: Track; playing: boolean; progress: number; playedAt: number | null }) {
   return (
@@ -101,9 +101,9 @@ function Ticket({ track, playing, progress, playedAt }: { track: Track; playing:
       target="_blank"
       rel="noreferrer"
       aria-label={`${track.title} by ${track.artists}, open in Spotify`}
-      className="group grid w-full max-w-[920px] grid-cols-[clamp(56px,11vw,128px)_minmax(0,1fr)] text-deep no-underline drop-shadow-[0_18px_28px_rgba(17,48,46,.5)] transition-transform duration-300 hover:-translate-y-1"
+      className="group grid w-full max-w-[920px] grid-cols-[clamp(56px,11vw,128px)_minmax(0,1fr)] text-deep no-underline drop-shadow-[0_18px_28px_rgba(17,48,46,.5)]"
     >
-      <div style={notch('right')} className="flex flex-col items-center justify-between rounded-l-[14px] border-r-[3px] border-dashed border-sand bg-deep py-6 text-sand">
+      <div style={notch('right')} className="flex origin-bottom-right flex-col items-center justify-between rounded-l-[14px] border-r-[3px] border-dashed border-sand bg-deep py-6 text-sand transition-transform duration-500 ease-[cubic-bezier(.2,.9,.3,1.3)] group-hover:-translate-x-1.5 group-hover:-rotate-[5deg] motion-reduce:transition-none">
         <span className={`${mono} text-[11px] max-sm:[writing-mode:vertical-rl]`}>Ticket</span>
         <span className="flex flex-col items-center gap-0.5">
           <span className={`${mono} text-xs text-mint`}>No.</span>
@@ -114,9 +114,9 @@ function Ticket({ track, playing, progress, playedAt }: { track: Track; playing:
 
       <div
         style={notch('left')}
-        className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[clamp(16px,2.4vw,28px)] rounded-r-[14px] bg-sand py-[clamp(18px,2.4vw,26px)] pr-[clamp(16px,2.2vw,24px)] pl-[clamp(20px,2.6vw,28px)] max-md:grid-cols-[minmax(0,1fr)]"
+        className="grid origin-bottom-left grid-cols-[auto_minmax(0,1fr)_auto] items-center transition-transform duration-500 ease-[cubic-bezier(.2,.9,.3,1.3)] group-hover:translate-x-1 group-hover:rotate-[1deg] motion-reduce:transition-none gap-[clamp(16px,2.4vw,28px)] rounded-r-[14px] bg-sand py-[clamp(18px,2.4vw,26px)] pr-[clamp(16px,2.2vw,24px)] pl-[clamp(20px,2.6vw,28px)] max-md:grid-cols-[minmax(0,1fr)]"
       >
-        <PixelCover src={track.image} alt={`${track.album} cover`} />
+        <Cover src={track.image} alt={`${track.album} cover`} />
 
         <div className="flex min-w-0 flex-col gap-2">
           <span className={`${mono} flex items-center gap-2 text-xs font-semibold text-teal-2`}>
@@ -183,49 +183,10 @@ function Eq({ playing }: { playing: boolean }) {
   )
 }
 
-// Ordered (Bayer 4×4) dither, so the cover matches the site's dithered bands.
-const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16)
-const RAMP = ['#1d4f4c', '#22706c', '#2f8f8a', '#a9d3cf', '#e9dfca'].map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)))
-const SIZE = 40
-
-// The album cover, shrunk to 40×40 and dithered into the teal palette, then scaled up with sharp
-// pixels. If the image can't be read (no CORS), it falls back to the plain cover, still pixelated.
-function PixelCover({ src, alt }: { src: string | null; alt: string }) {
-  const ref = useRef<HTMLCanvasElement>(null)
-  useEffect(() => {
-    const c = ref.current
-    const ctx = c?.getContext('2d', { willReadFrequently: true })
-    if (!c || !ctx) return
-    ctx.fillStyle = '#22706c'
-    ctx.fillRect(0, 0, SIZE, SIZE)
-    if (!src) return
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, SIZE, SIZE)
-      try {
-        const d = ctx.getImageData(0, 0, SIZE, SIZE)
-        const p = d.data
-        const n = RAMP.length - 1
-        for (let i = 0; i < p.length; i += 4) {
-          const x = (i / 4) % SIZE
-          const y = Math.floor(i / 4 / SIZE)
-          const l = (0.2126 * p[i] + 0.7152 * p[i + 1] + 0.0722 * p[i + 2]) / 255
-          const s = Math.min(0.9999, l) * n
-          const k = s | 0
-          const [r, g, b] = RAMP[s - k > BAYER4[(y & 3) * 4 + (x & 3)] ? k + 1 : k]
-          p[i] = r
-          p[i + 1] = g
-          p[i + 2] = b
-        }
-        ctx.putImageData(d, 0, 0)
-      } catch {
-        // Cross-origin image without CORS: keep the plain pixelated cover.
-      }
-    }
-    img.src = src
-  }, [src])
-  return <canvas ref={ref} width={SIZE} height={SIZE} role="img" aria-label={alt} className="pixelated aspect-square w-[clamp(96px,12vw,132px)]" />
+// The album cover as it is.
+function Cover({ src, alt }: { src: string | null; alt: string }) {
+  const box = 'aspect-square w-[clamp(96px,12vw,132px)] shadow-[0_2px_0_rgba(29,79,76,.25)]'
+  return src ? <img src={src} alt={alt} width={132} height={132} loading="lazy" className={`${box} object-cover`} /> : <span role="img" aria-label={alt} className={`${box} bg-teal-2`} />
 }
 
 const time = (ms: number) => {

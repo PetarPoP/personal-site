@@ -312,10 +312,12 @@ function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement
     ...profile.cvs.map((c) => ({ label: c.label, href: c.href })),
   ]
   return (
+    // Top padding = the space from Work to "Where I've been" (sand padding + band), so the
+    // headings are evenly spaced.
     <footer
       id="contact"
       ref={footRef}
-      className="relative flex scroll-mt-24 flex-col gap-[clamp(80px,14vw,200px)] overflow-hidden bg-teal pt-[clamp(64px,9vw,150px)] pb-3 text-paper"
+      className="relative flex scroll-mt-24 flex-col gap-[clamp(80px,14vw,200px)] overflow-hidden bg-teal pt-[calc(clamp(56px,9vw,150px)+clamp(220px,44vw,700px))] pb-3 text-paper"
     >
       <canvas data-dither="#e9dfca,#c9c0ad,#2f8f8a,#22706c,#1d4f4c" data-mode="foot" aria-hidden className="pixelated absolute inset-0 h-full w-full" />
       <div className="relative z-[1] flex flex-wrap items-end justify-between gap-[clamp(28px,4vw,64px)] px-[clamp(20px,6vw,110px)]">
