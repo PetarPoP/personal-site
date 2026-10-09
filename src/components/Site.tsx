@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { ArrowUpRight } from 'lucide-react'
 import { profile, projectKinds, projects, timeline } from '#/data/portfolio'
 import { getRepos } from '#/lib/github'
 import type { Repo } from '#/lib/github'
 import type { ProjectKind } from '#/data/portfolio'
 import Lenis from 'lenis'
-import { drawBand, drawHero } from '#/lib/dither'
-import { Spotify } from './Spotify'
+import { createDither } from '#/lib/dither-renderer'
+
+// The Spotify ticket (and its QR code library) loads separately; it sits at the very bottom.
+const Spotify = lazy(() => import('./Spotify').then((m) => ({ default: m.Spotify })))
 
 const ease = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2)
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
@@ -21,6 +23,7 @@ export function Site() {
   const sheetRef = useRef<HTMLDivElement>(null)
   const footRef = useRef<HTMLDivElement>(null)
   const markRef = useRef<HTMLDivElement>(null)
+  const navRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -78,6 +81,18 @@ export function Site() {
           mk.style.opacity = String(e)
         }
       }
+      // Which colour is under the header: light text and a dark fade over dark sections.
+      const nav = navRef.current
+      if (nav) {
+        const y = nav.offsetHeight / 2
+        const el = document.elementFromPoint(window.innerWidth / 2, y)?.closest<HTMLElement>('[data-tone]')
+        let tone = el?.dataset.tone ?? 'light'
+        if (el && tone.includes(',')) {
+          const r = el.getBoundingClientRect()
+          tone = tone.split(',')[(y - r.top) / r.height < 0.5 ? 0 : 1]
+        }
+        if (nav.dataset.tone !== tone) nav.dataset.tone = tone
+      }
       dirty = true
     }
 
@@ -87,17 +102,19 @@ export function Site() {
       return !r || !(r.top < 0 && r.bottom > window.innerHeight)
     }
 
+    // The dithered canvases are drawn in a worker where the browser allows it (dither-renderer.ts).
+    const dither = createDither(heroRef.current, [...(sheetRef.current?.querySelectorAll<HTMLCanvasElement>('canvas[data-dither]') ?? [])])
+
     const loop = (ts: number) => {
       raf = requestAnimationFrame(loop)
       const t = reduce ? 0 : (ts - t0) / 1000
-      if (dirty || (!reduce && ts - lastBands > 50)) {
-        lastBands = ts
-        sheetRef.current?.querySelectorAll<HTMLCanvasElement>('canvas[data-dither]').forEach((c) => drawBand(c, t, window.innerHeight, px()))
-      }
-      if (!dirty && (reduce || ts - lastHero < 70)) return
+      const bands = dirty || (!reduce && ts - lastBands > 66)
+      const hero = dirty || (!reduce && ts - lastHero >= 80)
+      if (!bands && !hero) return
+      if (bands) lastBands = ts
+      if (hero) lastHero = ts
       dirty = false
-      lastHero = ts
-      if (heroRef.current && heroVisible()) drawHero(heroRef.current, t, phase, px())
+      dither.frame(t, phase, px(), { bands, hero: hero && heroVisible() })
     }
 
     // Smooth wheel scrolling (touch keeps the phone's own scrolling). Anchor links glide too.
@@ -119,9 +136,9 @@ export function Site() {
 
   return (
     <main className="relative bg-sand text-ink">
-      <Nav />
+      <Nav navRef={navRef} />
 
-      <div id="top" className="sticky top-0 z-0 h-svh overflow-hidden bg-sand">
+      <div id="top" data-tone="light" className="sticky top-0 z-0 h-svh overflow-hidden bg-sand">
         <h1
           ref={h1Ref}
           className="m-0 px-4 pt-[clamp(88px,13vh,150px)] text-center text-[clamp(46px,8.4vw,168px)] leading-[.92] font-semibold tracking-[-.035em] will-change-[transform,opacity]"
@@ -130,7 +147,7 @@ export function Site() {
           <br />
           {profile.headline[1]}
         </h1>
-        <div ref={panelRef} className="absolute top-[46vh] right-4 bottom-4 left-4 overflow-hidden border border-ink bg-teal">
+        <div ref={panelRef} data-tone="dark" className="absolute top-[46vh] right-4 bottom-4 left-4 overflow-hidden border border-ink bg-teal">
           <canvas ref={heroRef} aria-hidden className="pixelated absolute top-0 left-0 h-lvh w-screen" />
         </div>
       </div>
@@ -138,16 +155,16 @@ export function Site() {
       <div className="h-[85svh]" />
 
       <div ref={sheetRef} className="relative z-[2]">
-        <Band colors="none,#2f8f8a,#c9c0ad,#e2d8c4,#e9dfca" className="h-[clamp(240px,48vw,760px)]" />
+        <Band colors="none,#2f8f8a,#c9c0ad,#e2d8c4,#e9dfca" tone="dark,light" className="h-[clamp(240px,48vw,760px)]" />
 
-        <div className="flex flex-col gap-[clamp(96px,16vw,240px)] bg-sand px-[clamp(20px,6vw,110px)] py-[clamp(56px,9vw,150px)]">
+        <div data-tone="light" className="flex flex-col gap-[clamp(96px,16vw,240px)] bg-sand px-[clamp(20px,6vw,110px)] py-[clamp(56px,9vw,150px)]">
           <Intro />
           <Work />
         </div>
 
-        <Band colors="#e9dfca,#e2d8c4,#c9c0ad,#2f8f8a" className="h-[clamp(220px,44vw,700px)]" />
+        <Band colors="#e9dfca,#e2d8c4,#c9c0ad,#2f8f8a" tone="light,dark" className="h-[clamp(220px,44vw,700px)]" />
 
-        <section className="relative flex flex-col gap-[clamp(120px,16vw,240px)] bg-deep px-[clamp(20px,6vw,110px)] py-[clamp(110px,18vw,280px)] text-paper">
+        <section data-tone="dark" className="relative flex flex-col gap-[clamp(120px,16vw,240px)] bg-deep px-[clamp(20px,6vw,110px)] py-[clamp(110px,18vw,280px)] text-paper">
           <canvas data-dither="#2f8f8a,#22706c,#1d4f4c" data-mode="field" aria-hidden className="pixelated absolute inset-0 h-full w-full" />
           <div id="experience" className="relative z-[1] flex scroll-mt-24 flex-col gap-[clamp(40px,6vw,88px)]">
             <h2 className="heading">Where I've been</h2>
@@ -172,8 +189,9 @@ export function Site() {
   )
 }
 
-function Band({ colors, className }: { colors: string; className: string }) {
-  return <canvas data-dither={colors} aria-hidden className={`pixelated -my-px block w-full ${className}`} />
+// `tone` is the colour under the header in the band's top and bottom half (see Nav).
+function Band({ colors, tone, className }: { colors: string; tone: string; className: string }) {
+  return <canvas data-dither={colors} data-tone={tone} aria-hidden className={`pixelated -my-px block w-full ${className}`} />
 }
 
 function Logo({ className = '' }: { className?: string }) {
@@ -187,10 +205,17 @@ function Logo({ className = '' }: { className?: string }) {
   )
 }
 
-function Nav() {
+function Nav({ navRef }: { navRef: React.RefObject<HTMLElement | null> }) {
   const link = 'pointer-events-auto transition-opacity hover:opacity-60'
   return (
-    <nav className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between gap-4 px-[clamp(16px,3vw,40px)] py-[clamp(16px,2vw,22px)] text-[15px] font-medium tracking-[-.01em] whitespace-nowrap text-paper mix-blend-difference sm:text-base">
+    <nav
+      ref={navRef}
+      data-tone="light"
+      className="group/nav pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between gap-4 px-[clamp(16px,3vw,40px)] py-[clamp(16px,2vw,22px)] text-[15px] font-medium tracking-[-.01em] whitespace-nowrap text-ink transition-colors duration-300 data-[tone=dark]:text-paper sm:text-base"
+    >
+      {/* A soft fade behind the links, dark over dark sections and cream over light ones. */}
+      <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-[170%] bg-linear-to-b from-sand/90 via-sand/60 to-transparent transition-opacity duration-300 group-data-[tone=dark]/nav:opacity-0" />
+      <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-[170%] bg-linear-to-b from-[#0d2624]/55 via-[#0d2624]/25 to-transparent opacity-0 transition-opacity duration-300 group-data-[tone=dark]/nav:opacity-100" />
       <a href="#top" className={`${link} flex items-center gap-2.5 font-semibold`}>
         <Logo />
         {profile.name}
@@ -316,6 +341,7 @@ function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement
     // headings are evenly spaced.
     <footer
       id="contact"
+      data-tone="dark"
       ref={footRef}
       className="relative flex scroll-mt-24 flex-col gap-[clamp(80px,14vw,200px)] overflow-hidden bg-teal pt-[calc(clamp(56px,9vw,150px)+clamp(220px,44vw,700px))] pb-3 text-paper"
     >
@@ -336,7 +362,9 @@ function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement
         </div>
       </div>
       <div id="music" className="relative z-[1] scroll-mt-24 px-[clamp(20px,6vw,110px)] empty:hidden">
-        <Spotify />
+        <Suspense fallback={null}>
+          <Spotify />
+        </Suspense>
       </div>
       <div className="pointer-events-none relative z-[1] flex flex-col gap-4 px-4">
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-[15px] text-sand">
