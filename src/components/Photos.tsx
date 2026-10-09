@@ -7,6 +7,7 @@ import type { Frame } from '#/lib/usePhotos'
 const FIRST = 12
 
 // Petar's photos from his Immich album. Hidden when the album isn't set up or can't be reached.
+// Not on the page for now (Pop is deciding where the photos go): put <Photos /> back in Site.tsx.
 export function Photos() {
   const frames = usePhotos()
   const [all, setAll] = useState(false)

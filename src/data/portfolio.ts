@@ -2,7 +2,7 @@
 
 export const profile = {
   name: 'Petar Popović',
-  role: 'Firmware & web developer',
+  role: 'Firmware & web engineer',
   location: 'Split, Croatia',
   email: 'petarpopovic0712@gmail.com',
   github: 'https://github.com/PetarPoP',
@@ -10,7 +10,7 @@ export const profile = {
     { lang: 'EN', label: 'CV (EN)', href: '/petar-popovic-cv-en.pdf' },
     { lang: 'HR', label: 'CV (HR)', href: '/petar-popovic-cv-hr.pdf' },
   ],
-  headline: ['Firmware & web', 'built by hand'],
+  headline: ['Firmware & web', 'engineer'],
   intro:
     'Fifth-year computer science student in Split, from Livno. I write real-time firmware for the FESB Racing electric car and build web apps with Next.js and React.',
   tags: ['Firmware', 'Web', 'FESB Racing', 'Photography', 'Livno to Split'],
@@ -19,7 +19,8 @@ export const profile = {
 export type ProjectKind = 'embedded' | 'web' | 'iot'
 export const projectKinds: Record<ProjectKind, string> = { embedded: 'Embedded', web: 'Web', iot: 'IoT' }
 
-export type Project = { name: string; kind: ProjectKind; stack: string; desc: string }
+// `repo` is the repository's name under profile.github, for projects whose code is public.
+export type Project = { name: string; kind: ProjectKind; stack: string; desc: string; repo?: string }
 
 // "Key projects" from the CV.
 export const projects: Project[] = [
@@ -40,24 +41,28 @@ export const projects: Project[] = [
     kind: 'web',
     stack: 'TanStack Start · React · TS',
     desc: 'Website for the FESB Racing Formula Student team.',
+    repo: 'fesb-racing-site',
   },
   {
     name: 'OBD BLE monitor',
     kind: 'embedded',
     stack: 'C · ESP32 · React Native',
     desc: 'Car diagnostics read over OBD and streamed to a phone over Bluetooth LE.',
+    repo: 'esp32-obd',
   },
   {
     name: 'STM32 embedded tasks',
     kind: 'embedded',
     stack: 'C · STM32 · Wokwi',
     desc: 'Embedded programming exercises on STM32, simulated in Wokwi.',
+    repo: 'FESB_racing',
   },
   {
     name: 'IdeaPlanner',
     kind: 'web',
     stack: 'Next.js · Tauri · Rust',
     desc: 'Desktop app for planning and organising ideas.',
+    repo: 'IdeaPlanner',
   },
   {
     name: 'Smart city model',
@@ -70,6 +75,7 @@ export const projects: Project[] = [
     kind: 'web',
     stack: 'React · Express · MongoDB',
     desc: 'Full-stack web app for a coffee shop.',
+    repo: 'coffe-page',
   },
   {
     name: 'Student jobs portal',

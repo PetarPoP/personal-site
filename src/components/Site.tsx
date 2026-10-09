@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight } from 'lucide-react'
 import { profile, projectKinds, projects, timeline } from '#/data/portfolio'
+import { getRepos } from '#/lib/github'
+import type { Repo } from '#/lib/github'
 import type { ProjectKind } from '#/data/portfolio'
+import Lenis from 'lenis'
 import { drawBand, drawHero } from '#/lib/dither'
-import { Photos } from './Photos'
+import { Spotify } from './Spotify'
 
 const ease = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2)
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
@@ -97,6 +100,9 @@ export function Site() {
       if (heroRef.current && heroVisible()) drawHero(heroRef.current, t, phase, px())
     }
 
+    // Smooth wheel scrolling (touch keeps the phone's own scrolling). Anchor links glide too.
+    const lenis = reduce ? null : new Lenis({ autoRaf: true, anchors: { offset: -16 } })
+
     const onResize = () => measure()
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onResize)
@@ -105,6 +111,7 @@ export function Site() {
     raf = requestAnimationFrame(loop)
     return () => {
       cancelAnimationFrame(raf)
+      lenis?.destroy()
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onResize)
     }
@@ -136,12 +143,11 @@ export function Site() {
         <div className="flex flex-col gap-[clamp(96px,16vw,240px)] bg-sand px-[clamp(20px,6vw,110px)] py-[clamp(56px,9vw,150px)]">
           <Intro />
           <Work />
-          <Photos />
         </div>
 
         <Band colors="#e9dfca,#e2d8c4,#c9c0ad,#2f8f8a" className="h-[clamp(220px,44vw,700px)]" />
 
-        <section className="relative bg-deep px-[clamp(20px,6vw,110px)] py-[clamp(110px,18vw,280px)] text-paper">
+        <section className="relative flex flex-col gap-[clamp(120px,16vw,240px)] bg-deep px-[clamp(20px,6vw,110px)] py-[clamp(110px,18vw,280px)] text-paper">
           <canvas data-dither="#2f8f8a,#22706c,#1d4f4c" data-mode="field" aria-hidden className="pixelated absolute inset-0 h-full w-full" />
           <div id="experience" className="relative z-[1] flex scroll-mt-24 flex-col gap-[clamp(40px,6vw,88px)]">
             <h2 className="heading">Where I've been</h2>
@@ -193,8 +199,8 @@ function Nav() {
         <a href="#work" className={link}>
           Work
         </a>
-        <a href="#photos" className={`${link} max-sm:hidden`}>
-          Photos
+        <a href="#music" className={`${link} max-sm:hidden`}>
+          Music
         </a>
         <a href="#experience" className={`${link} max-sm:hidden`}>
           Experience
@@ -230,6 +236,18 @@ function Work() {
   const [kind, setKind] = useState<ProjectKind | 'all'>('all')
   const filters: [ProjectKind | 'all', string][] = [['all', 'All'], ...(Object.entries(projectKinds) as [ProjectKind, string][])]
   const shown = projects.filter((p) => kind === 'all' || p.kind === kind)
+  // Until GitHub answers, cards link to the repos named in portfolio.ts; after that, only to
+  // the ones that are public, with when they last changed.
+  const [repos, setRepos] = useState<Record<string, Repo> | null>(null)
+  useEffect(() => {
+    let alive = true
+    getRepos()
+      .then((r) => alive && 'repos' in r && setRepos(r.repos))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
   return (
     <section id="work" className="flex scroll-mt-24 flex-col gap-[clamp(36px,6vw,88px)]">
       <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-5">
@@ -257,12 +275,35 @@ function Work() {
             <h3 className="m-0 text-[clamp(24px,2.2vw,32px)] leading-[1.05] font-semibold tracking-[-.03em]">{p.name}</h3>
             <p className="m-0 text-base leading-normal text-pretty text-muted">{p.desc}</p>
             <span className="text-sm text-muted/80">{p.stack}</span>
+            <Code repo={p.repo} live={repos} />
           </article>
         ))}
       </div>
     </section>
   )
 }
+
+function Code({ repo, live }: { repo?: string; live: Record<string, Repo> | null }) {
+  if (!repo) return null
+  const info = live?.[repo.toLowerCase()]
+  if (live && !info) return null
+  return (
+    <span className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <a
+        href={info?.url ?? `${profile.github.replace(/\/+$/, '')}/${repo}`}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-1 text-[15px] font-medium text-ink underline decoration-1 underline-offset-4 transition-colors hover:text-teal"
+      >
+        Code on GitHub
+        <ArrowUpRight size={16} strokeWidth={1.75} />
+      </a>
+      {info && <span className="text-sm text-muted/80">updated {month(info.pushed)}</span>}
+    </span>
+  )
+}
+
+const month = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
 
 function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement | null>; markRef: React.RefObject<HTMLDivElement | null> }) {
   const links = [
@@ -271,10 +312,12 @@ function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement
     ...profile.cvs.map((c) => ({ label: c.label, href: c.href })),
   ]
   return (
+    // Top padding = the space from Work to "Where I've been" (sand padding + band), so the
+    // headings are evenly spaced.
     <footer
       id="contact"
       ref={footRef}
-      className="relative flex scroll-mt-24 flex-col gap-[clamp(80px,14vw,200px)] overflow-hidden bg-teal pt-[clamp(64px,9vw,150px)] pb-3 text-paper"
+      className="relative flex scroll-mt-24 flex-col gap-[clamp(80px,14vw,200px)] overflow-hidden bg-teal pt-[calc(clamp(56px,9vw,150px)+clamp(220px,44vw,700px))] pb-3 text-paper"
     >
       <canvas data-dither="#e9dfca,#c9c0ad,#2f8f8a,#22706c,#1d4f4c" data-mode="foot" aria-hidden className="pixelated absolute inset-0 h-full w-full" />
       <div className="relative z-[1] flex flex-wrap items-end justify-between gap-[clamp(28px,4vw,64px)] px-[clamp(20px,6vw,110px)]">
@@ -291,6 +334,9 @@ function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement
             </a>
           ))}
         </div>
+      </div>
+      <div id="music" className="relative z-[1] scroll-mt-24 px-[clamp(20px,6vw,110px)] empty:hidden">
+        <Spotify />
       </div>
       <div className="pointer-events-none relative z-[1] flex flex-col gap-4 px-4">
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-[15px] text-sand">

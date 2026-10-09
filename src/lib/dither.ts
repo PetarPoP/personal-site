@@ -39,6 +39,9 @@ function surface(c: Surface, px: number) {
   return { ctx, img: c._img, buf: c._buf!, w, h, W, H }
 }
 
+// Share of a band's height at each end that is a solid colour.
+const EDGE = 0.2
+
 const clamp = (v: number) => (v < 0 ? 0 : v > 0.9999 ? 0.9999 : v)
 
 const HERO = ['#e2d8c4', '#c9c0ad', '#2f8f8a', '#22706c'].map(pixel)
@@ -92,6 +95,12 @@ export function drawBand(c: Surface, t: number, vh: number, px: number) {
     const u = (x / w) * asp
     wv[x] = 0.12 * Math.sin(u * 2.1 + t * 0.5) + 0.06 * Math.sin(u * 5.3 - t * 0.8) + 0.03 * Math.sin(u * 11 + t * 1.3)
   }
+  // Edge wave: always smaller than EDGE, so a band's first and last rows stay solid.
+  const ew = new Float32Array(w)
+  for (let x = 0; x < w; x++) {
+    const u = (x / w) * asp
+    ew[x] = 0.12 * Math.sin(u * 3.1 + t * 0.35) + 0.06 * Math.sin(u * 7.7 - t * 0.5)
+  }
   const mode = c.dataset.mode
 
   if (mode) {
@@ -132,9 +141,16 @@ export function drawBand(c: Surface, t: number, vh: number, px: number) {
     const v0 = y / h
     const row = y * w
     const by = (y & 7) * 8
-    const env = Math.sin(Math.PI * v0)
+    // The big wave fades out towards both edges; a smaller one takes over there so the dots
+    // don't stop along a straight line. The value is stretched so the first and last rows are
+    // the pure section colours (the edge wave never reaches them), and eased so the dots thin
+    // out gently into the next section.
+    const sn = Math.sin(Math.PI * v0)
+    const env = sn * sn
     for (let x = 0; x < w; x++) {
-      const v = clamp(v0 + (wv[x] + bias + 0.04 * Math.sin(v0 * 9 + (x / w) * 14 - t)) * env * 1.6)
+      const raw = v0 + (wv[x] + bias + 0.04 * Math.sin(v0 * 9 + (x / w) * 14 - t)) * env * 1.9 + ew[x] * (1 - env)
+      const k = clamp((raw - EDGE) / (1 - 2 * EDGE))
+      const v = clamp(k * k * (3 - 2 * k))
       const si = v * n
       const i = si | 0
       buf[row + x] = si - i > BAYER[by + (x & 7)] ? P[i + 1] : P[i]

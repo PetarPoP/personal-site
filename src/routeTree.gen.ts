@@ -10,11 +10,23 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LlmsFullDottxtRouteImport } from './routes/llms-full[.]txt'
+import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as ApiPhotosIdRouteImport } from './routes/api/photos.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LlmsFullDottxtRoute = LlmsFullDottxtRouteImport.update({
+  id: '/llms-full.txt',
+  path: '/llms-full.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
+  id: '/llms.txt',
+  path: '/llms.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPhotosIdRoute = ApiPhotosIdRouteImport.update({
@@ -25,27 +37,35 @@ const ApiPhotosIdRoute = ApiPhotosIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/llms-full.txt': typeof LlmsFullDottxtRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/api/photos/$id': typeof ApiPhotosIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/llms-full.txt': typeof LlmsFullDottxtRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/api/photos/$id': typeof ApiPhotosIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/llms-full.txt': typeof LlmsFullDottxtRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/api/photos/$id': typeof ApiPhotosIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/photos/$id'
+  fullPaths: '/' | '/llms-full.txt' | '/llms.txt' | '/api/photos/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/photos/$id'
-  id: '__root__' | '/' | '/api/photos/$id'
+  to: '/' | '/llms-full.txt' | '/llms.txt' | '/api/photos/$id'
+  id: '__root__' | '/' | '/llms-full.txt' | '/llms.txt' | '/api/photos/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LlmsFullDottxtRoute: typeof LlmsFullDottxtRoute
+  LlmsDottxtRoute: typeof LlmsDottxtRoute
   ApiPhotosIdRoute: typeof ApiPhotosIdRoute
 }
 
@@ -56,6 +76,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/llms-full.txt': {
+      id: '/llms-full.txt'
+      path: '/llms-full.txt'
+      fullPath: '/llms-full.txt'
+      preLoaderRoute: typeof LlmsFullDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/llms.txt': {
+      id: '/llms.txt'
+      path: '/llms.txt'
+      fullPath: '/llms.txt'
+      preLoaderRoute: typeof LlmsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/photos/$id': {
@@ -70,6 +104,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LlmsFullDottxtRoute: LlmsFullDottxtRoute,
+  LlmsDottxtRoute: LlmsDottxtRoute,
   ApiPhotosIdRoute: ApiPhotosIdRoute,
 }
 export const routeTree = rootRouteImport
