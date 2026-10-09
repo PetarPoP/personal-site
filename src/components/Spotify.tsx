@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUpRight } from 'lucide-react'
+import type { CSSProperties } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { getNowPlaying } from '#/lib/spotify'
 import type { NowPlaying, Track } from '#/lib/spotify'
 
@@ -69,52 +70,99 @@ export function Spotify() {
 
   return (
     <div ref={ref} className={`flex flex-col gap-[clamp(28px,4vw,48px)] transition-opacity duration-700 ${track ? 'opacity-100' : 'opacity-0'}`}>
-      <h2 className="heading">{playing ? 'On repeat right now' : 'Last on repeat'}</h2>
-      {track && data && <Player track={track} playing={playing} progress={progress} playedAt={data.np.playedAt} />}
+      <h2 className="heading">{playing ? 'Playing right now' : 'Last played'}</h2>
+      {track && data && <Ticket track={track} playing={playing} progress={progress} playedAt={data.np.playedAt} />}
     </div>
   )
 }
 
-function Player({ track, playing, progress, playedAt }: { track: Track; playing: boolean; progress: number; playedAt: number | null }) {
+// Round bites out of the two corners on one side, where the stub tears off.
+const notch = (side: 'left' | 'right'): CSSProperties => {
+  const x = side === 'right' ? '100%' : '0'
+  const m = `radial-gradient(circle 14px at ${x} 0,transparent 13.5px,#000 14px) top/100% 51% no-repeat,radial-gradient(circle 14px at ${x} 100%,transparent 13.5px,#000 14px) bottom/100% 51% no-repeat`
+  return { WebkitMask: m, mask: m }
+}
+
+// A stable four-digit "seat number" for each song.
+const ticketNo = (url: string) => {
+  let h = 0
+  for (const ch of url) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return String(h % 10000).padStart(4, '0')
+}
+
+const mono = 'font-mono uppercase tracking-[.1em]'
+
+// The song as a concert ticket: a deep-teal stub, then the dithered cover, the song, and a QR
+// code that opens it in Spotify.
+function Ticket({ track, playing, progress, playedAt }: { track: Track; playing: boolean; progress: number; playedAt: number | null }) {
   return (
     <a
       href={track.url}
       target="_blank"
       rel="noreferrer"
-      className="group grid max-w-[880px] grid-cols-[clamp(96px,22vw,200px)_1fr] items-center gap-[clamp(16px,3vw,40px)] text-paper no-underline"
+      aria-label={`${track.title} by ${track.artists}, open in Spotify`}
+      className="group grid w-full max-w-[920px] grid-cols-[clamp(56px,11vw,128px)_minmax(0,1fr)] text-deep no-underline drop-shadow-[0_18px_28px_rgba(17,48,46,.5)] transition-transform duration-300 hover:-translate-y-1"
     >
-      <PixelCover src={track.image} alt={`${track.album} cover`} />
-      <div className="flex min-w-0 flex-col gap-[clamp(8px,1.2vw,14px)]">
-        <span className="flex items-center gap-2.5 text-[15px] text-mint">
-          <Eq playing={playing} />
-          {playing ? 'Listening on Spotify' : `Played on Spotify${playedAt ? ` · ${ago(playedAt)}` : ''}`}
+      <div style={notch('right')} className="flex flex-col items-center justify-between rounded-l-[14px] border-r-[3px] border-dashed border-sand bg-deep py-6 text-sand">
+        <span className={`${mono} text-[11px] max-sm:[writing-mode:vertical-rl]`}>Ticket</span>
+        <span className="flex flex-col items-center gap-0.5">
+          <span className={`${mono} text-xs text-mint`}>No.</span>
+          <span className="text-[clamp(18px,3.2vw,40px)] leading-none font-semibold tracking-[-.03em] tabular-nums">{ticketNo(track.url)}</span>
         </span>
-        <span className="truncate text-[clamp(24px,3vw,44px)] leading-[1.05] font-semibold tracking-[-.03em]">{track.title}</span>
-        <span className="truncate text-[clamp(15px,1.4vw,19px)] text-paper/75">
-          {track.artists} · {track.album}
-        </span>
-        <div className="mt-1 flex items-center gap-3 text-[13px] text-mint tabular-nums max-sm:hidden">
-          <span>{time(progress)}</span>
-          <Blocks value={playing ? progress / track.durationMs : 1} />
-          <span>{time(track.durationMs)}</span>
+        <span className={`${mono} text-[11px] max-sm:[writing-mode:vertical-rl]`}>Admit one</span>
+      </div>
+
+      <div
+        style={notch('left')}
+        className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[clamp(16px,2.4vw,28px)] rounded-r-[14px] bg-sand py-[clamp(18px,2.4vw,26px)] pr-[clamp(16px,2.2vw,24px)] pl-[clamp(20px,2.6vw,28px)] max-md:grid-cols-[minmax(0,1fr)]"
+      >
+        <PixelCover src={track.image} alt={`${track.album} cover`} />
+
+        <div className="flex min-w-0 flex-col gap-2">
+          <span className={`${mono} flex items-center gap-2 text-xs font-semibold text-teal-2`}>
+            <Eq playing={playing} />
+            {playing ? 'Live on Spotify' : `On Spotify${playedAt ? ` · ${ago(playedAt)}` : ''}`}
+          </span>
+          <span className="text-[clamp(28px,3.6vw,46px)] leading-[.95] font-semibold tracking-[-.035em] text-balance">{track.title}</span>
+          <span className="truncate text-[clamp(15px,1.4vw,17px)]">{track.artists}</span>
+
+          <div className={`${mono} mt-2 flex items-center gap-3 text-xs font-semibold tabular-nums`}>
+            <span className="min-w-8">{time(progress)}</span>
+            <Blocks value={playing ? progress / track.durationMs : 1} playing={playing} />
+            <span>{time(track.durationMs)}</span>
+          </div>
+
+          <div className={`${mono} flex gap-6 text-[11px]`}>
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-teal-2">Album</span>
+              <span className="truncate font-semibold">{track.album}</span>
+            </span>
+            {track.year && (
+              <span className="flex flex-col gap-0.5">
+                <span className="text-teal-2">Year</span>
+                <span className="font-semibold">{track.year}</span>
+              </span>
+            )}
+          </div>
         </div>
-        <span className="flex items-center gap-1 text-[15px] font-medium text-paper/90 underline decoration-1 underline-offset-4 transition-opacity group-hover:opacity-70">
-          Open in Spotify
-          <ArrowUpRight size={16} strokeWidth={1.75} />
+
+        <span className="flex flex-col items-center justify-center gap-2 self-stretch border-l-[1.5px] border-deep pl-5 max-md:hidden">
+          <QRCodeSVG value={track.url} size={96} fgColor="#1d4f4c" bgColor="#e9dfca" marginSize={0} />
+          <span className={`${mono} text-[10px] font-semibold transition-colors group-hover:text-teal`}>Scan ↗</span>
         </span>
       </div>
     </a>
   )
 }
 
-// Progress as a row of square pixels.
-function Blocks({ value }: { value: number }) {
+// Progress as a row of square pixels; the newest lit one blinks while a song plays.
+function Blocks({ value, playing }: { value: number; playing: boolean }) {
   const n = 28
   const lit = Math.round(Math.max(0, Math.min(1, value)) * n)
   return (
-    <span aria-hidden className="flex flex-1 gap-[3px]">
+    <span aria-hidden className="flex flex-1 items-center gap-[3px]">
       {Array.from({ length: n }, (_, i) => (
-        <span key={i} className={`aspect-square max-w-2.5 flex-1 ${i < lit ? 'bg-mint' : 'bg-paper/15'}`} />
+        <span key={i} className={`aspect-square max-w-2 flex-1 ${i < lit ? 'bg-deep' : 'bg-deep/15'} ${playing && i === lit - 1 ? 'animate-pulse' : ''}`} />
       ))}
     </span>
   )
@@ -127,7 +175,7 @@ function Eq({ playing }: { playing: boolean }) {
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className={`w-[3px] origin-bottom bg-mint ${playing ? 'eq-bar h-3' : 'h-1'}`}
+          className={`w-[3px] origin-bottom bg-teal-2 ${playing ? 'eq-bar h-3' : 'h-1'}`}
           style={playing ? { animationDelay: `${-i * 0.27}s` } : undefined}
         />
       ))}
@@ -177,7 +225,7 @@ function PixelCover({ src, alt }: { src: string | null; alt: string }) {
     }
     img.src = src
   }, [src])
-  return <canvas ref={ref} width={SIZE} height={SIZE} role="img" aria-label={alt} className="pixelated aspect-square w-full border border-mint/40" />
+  return <canvas ref={ref} width={SIZE} height={SIZE} role="img" aria-label={alt} className="pixelated aspect-square w-[clamp(96px,12vw,132px)]" />
 }
 
 const time = (ms: number) => {

@@ -164,9 +164,6 @@ export function Site() {
               ))}
             </div>
           </div>
-          <div id="music" className="relative z-[1] scroll-mt-24">
-            <Spotify />
-          </div>
         </section>
 
         <Contact footRef={footRef} markRef={markRef} />
@@ -335,6 +332,9 @@ function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement
             </a>
           ))}
         </div>
+      </div>
+      <div id="music" className="relative z-[1] scroll-mt-24 px-[clamp(20px,6vw,110px)] empty:hidden">
+        <Spotify />
       </div>
       <div className="pointer-events-none relative z-[1] flex flex-col gap-4 px-4">
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-[15px] text-sand">

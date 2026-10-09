@@ -9,6 +9,7 @@ export type Track = {
   title: string
   artists: string
   album: string
+  year: string | null
   image: string | null
   url: string
   durationMs: number
@@ -77,7 +78,7 @@ type SpotifyTrack = {
   duration_ms: number
   external_urls: { spotify: string }
   artists: { name: string }[]
-  album: { name: string; images: { url: string; width: number }[] }
+  album: { name: string; release_date?: string; images: { url: string; width: number }[] }
 }
 
 const toTrack = (t: SpotifyTrack): Track => {
@@ -86,6 +87,7 @@ const toTrack = (t: SpotifyTrack): Track => {
     title: t.name,
     artists: t.artists.map((a) => a.name).join(', '),
     album: t.album.name,
+    year: t.album.release_date?.slice(0, 4) || null,
     // The smallest cover that is still at least 300px wide.
     image: (images.find((i) => i.width >= 300) ?? images[images.length - 1])?.url ?? null,
     url: t.external_urls.spotify,
@@ -136,6 +138,7 @@ async function fetchNowPlaying(): Promise<NowPlaying> {
         title: 'Bezimena',
         artists: 'Azra',
         album: 'Sunčana strana ulice',
+        year: '1981',
         image: process.env.SPOTIFY_MOCK_IMAGE ?? null,
         url: 'https://open.spotify.com',
         durationMs: 215_000,

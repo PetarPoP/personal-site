@@ -15,6 +15,7 @@
   --color-coral: #e2552d;
 
   --font-sans: 'Instrument Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
 @layer base {
