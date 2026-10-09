@@ -11,8 +11,8 @@ export const Route = createRootRoute({
       { title: site.title },
       { name: 'description', content: site.description },
       { name: 'author', content: 'Petar Popović' },
-      { name: 'theme-color', content: '#0d1b1c' },
-      // Link previews (the pages under /<app> override title, description and url).
+      { name: 'theme-color', content: '#e9dfca' },
+      // Link previews.
       { property: 'og:type', content: 'website' },
       { property: 'og:site_name', content: 'Petar Popović' },
       { property: 'og:locale', content: 'en_US' },
@@ -21,7 +21,7 @@ export const Route = createRootRoute({
       { property: 'og:image', content: site.image },
       { property: 'og:image:width', content: '1200' },
       { property: 'og:image:height', content: '630' },
-      { property: 'og:image:alt', content: 'POP/OS, the site of Petar Popović' },
+      { property: 'og:image:alt', content: 'Petar Popović: firmware & web, built by hand' },
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: site.title },
       { name: 'twitter:description', content: site.description },
@@ -35,7 +35,7 @@ export const Route = createRootRoute({
       { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
       {
         rel: 'stylesheet',
-        href: 'https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap',
+        href: 'https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&display=swap',
       },
       { rel: 'stylesheet', href: appCss },
     ],
