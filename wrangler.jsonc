@@ -7,5 +7,8 @@
   "assets": {
     "html_handling": "drop-trailing-slash"
   },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // PR branches are deployed with `wrangler preview`, which requires this block. Previews need no
+  // separate settings; IMMICH_SHARE_URL can be set for them with `wrangler preview base-config secret put`.
+  "previews": {}
 }
