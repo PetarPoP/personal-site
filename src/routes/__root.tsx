@@ -38,8 +38,9 @@ export const Route = createRootRoute({
       { rel: 'icon', href: '/favicon-32.png?v=3', type: 'image/png', sizes: '32x32' },
       { rel: 'apple-touch-icon', href: '/apple-touch-icon.png?v=3' },
       { rel: 'stylesheet', href: appCss },
-      // The heading font starts downloading with the page instead of after the stylesheet.
-      { rel: 'preload', href: '/fonts/instrument-sans-latin-wght-normal.woff2', as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' },
+      // The heading font starts downloading with the page instead of after the stylesheet. Both
+      // halves: latin-ext has the ć in the name shown at the top of the page.
+      ...['latin', 'latin-ext'].map((s) => ({ rel: 'preload', href: `/fonts/instrument-sans-${s}-wght-normal.woff2`, as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' as const })),
       // The whole site as plain text for AI assistants.
       { rel: 'alternate', type: 'text/markdown', href: '/llms.txt', title: 'Petar Popović (plain text for AI assistants)' },
     ],
