@@ -143,6 +143,8 @@ export function Site() {
           ref={h1Ref}
           className="m-0 px-4 pt-[clamp(88px,13vh,150px)] text-center text-[clamp(46px,8.4vw,168px)] leading-[.92] font-semibold tracking-[-.035em] will-change-[transform,opacity]"
         >
+          {/* The name leads the page's main heading for search engines and screen readers. */}
+          <span className="sr-only">{profile.name}, </span>
           {profile.headline[0]}
           <br />
           {profile.headline[1]}

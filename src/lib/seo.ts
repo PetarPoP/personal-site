@@ -22,6 +22,7 @@ export const jsonLd = {
       '@id': `${site.url}/#website`,
       url: `${site.url}/`,
       name: profile.name,
+      alternateName: ['Petar Popovic', 'petarpopovic.com'],
       description: site.description,
       inLanguage: 'en',
       publisher: { '@id': `${site.url}/#person` },
@@ -40,6 +41,11 @@ export const jsonLd = {
       '@type': 'Person',
       '@id': `${site.url}/#person`,
       name: profile.name,
+      // How people type it without the "ć", and the handle used online.
+      alternateName: ['Petar Popovic', 'PetarPoP'],
+      givenName: 'Petar',
+      familyName: 'Popović',
+      mainEntityOfPage: { '@id': `${site.url}/#page` },
       url: `${site.url}/`,
       image: site.image,
       email: `mailto:${profile.email}`,
@@ -50,7 +56,7 @@ export const jsonLd = {
       alumniOf: timeline.filter((x) => x.school).map((x) => ({ '@type': 'EducationalOrganization', name: x.where })),
       knowsAbout: ['Embedded firmware', 'C', 'STM32', 'CAN bus', 'ESP32', 'React', 'Next.js', 'TypeScript', 'TanStack Start', 'Photography'],
       knowsLanguage: ['en', 'hr'],
-      sameAs: [profile.github],
+      sameAs: [profile.github, ...profile.profiles],
     },
     {
       '@type': 'ItemList',

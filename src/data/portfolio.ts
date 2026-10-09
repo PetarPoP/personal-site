@@ -6,6 +6,8 @@ export const profile = {
   location: 'Split, Croatia',
   email: 'petarpopovic0712@gmail.com',
   github: 'https://github.com/PetarPoP',
+  // Pop's other public profiles; search engines use them to tie the site to his name.
+  profiles: ['https://www.instagram.com/pop_2110/', 'https://www.instagram.com/pop.perspektiva/'],
   cvs: [
     { lang: 'EN', label: 'CV (EN)', href: '/petar-popovic-cv-en.pdf' },
     { lang: 'HR', label: 'CV (HR)', href: '/petar-popovic-cv-hr.pdf' },
