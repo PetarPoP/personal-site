@@ -1,0 +1,9 @@
+# The old POP/OS app addresses now point at the matching section of the one-page site.
+/projects /#work 301
+/photos /#photos 301
+/cv /#experience 301
+/about / 301
+/mail /#contact 301
+/notes / 301
+/spotify / 301
+/terminal / 301
