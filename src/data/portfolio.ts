@@ -10,7 +10,7 @@ export const profile = {
     { lang: 'EN', label: 'CV (EN)', href: '/petar-popovic-cv-en.pdf' },
     { lang: 'HR', label: 'CV (HR)', href: '/petar-popovic-cv-hr.pdf' },
   ],
-  headline: ['Firmware & web', 'built by hand'],
+  headline: ['Firmware & web', 'engineer'],
   intro:
     'Fifth-year computer science student in Split, from Livno. I write real-time firmware for the FESB Racing electric car and build web apps with Next.js and React.',
   tags: ['Firmware', 'Web', 'FESB Racing', 'Photography', 'Livno to Split'],

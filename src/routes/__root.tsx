@@ -21,7 +21,7 @@ export const Route = createRootRoute({
       { property: 'og:image', content: site.image },
       { property: 'og:image:width', content: '1200' },
       { property: 'og:image:height', content: '630' },
-      { property: 'og:image:alt', content: 'Petar Popović: firmware & web, built by hand' },
+      { property: 'og:image:alt', content: 'Petar Popović, firmware & web engineer' },
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: site.title },
       { name: 'twitter:description', content: site.description },
