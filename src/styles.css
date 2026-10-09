@@ -113,11 +113,35 @@
   animation: eq 0.9s steps(4) infinite;
 }
 
+/* The Spotify ticket: the stub and the ticket tear apart on hover (edges from Spotify.tsx). */
+.ticket-tear {
+  clip-path: var(--rest);
+  transition-property: translate, rotate, clip-path;
+  transition-duration: 0.7s;
+  transition-timing-function: cubic-bezier(0.3, 1.25, 0.4, 1);
+}
+.group:hover .ticket-tear {
+  clip-path: var(--torn);
+}
+.ticket-crumb {
+  opacity: 0;
+  transition:
+    translate 0.6s cubic-bezier(0.2, 0.8, 0.3, 1),
+    rotate 0.6s ease-out,
+    opacity 0.3s;
+}
+.group:hover .ticket-crumb {
+  opacity: 1;
+  translate: var(--x) var(--y);
+  rotate: 45deg;
+}
+
+/* Small effects (equaliser bars, the ticket tear) stay on; scroll effects are turned off. */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
-  *,
+  *:not(.keep-motion, .ticket-tear, .ticket-crumb),
   *::before,
   *::after {
     transition-duration: 0s !important;

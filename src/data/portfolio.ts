@@ -2,7 +2,7 @@
 
 export const profile = {
   name: 'Petar Popović',
-  role: 'Firmware & web developer',
+  role: 'Firmware & web engineer',
   location: 'Split, Croatia',
   email: 'petarpopovic0712@gmail.com',
   github: 'https://github.com/PetarPoP',

@@ -8,14 +8,15 @@ type Live = Extract<NowPlaying, { playing: boolean }>
 
 const POLL_MS = 30_000
 
-// What Petar is listening to, in the site's teal pixel style. Asked only while the section is on
-// screen (and the tab is visible), so it costs the Worker little. Hidden when Spotify isn't set
-// up or can't be reached.
+// What Petar is listening to, as a ticket. Asked every 30 seconds (and when a song should end)
+// while the section is on screen and the tab is visible, so it costs the Worker little. Hidden
+// when Spotify isn't set up; after an error the last song stays until Spotify answers again.
 export function Spotify() {
   const ref = useRef<HTMLDivElement>(null)
   const [data, setData] = useState<{ np: Live; at: number } | null>(null)
   const [hidden, setHidden] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  const reload = useRef(() => {})
 
   useEffect(() => {
     const el = ref.current
@@ -23,18 +24,25 @@ export function Spotify() {
     let visible = false
     let timer = 0
     let alive = true
+    let busy = false
     const load = () => {
       window.clearTimeout(timer)
-      if (!visible || document.hidden) return
+      if (!visible || document.hidden || busy) return
+      busy = true
       getNowPlaying()
         .then((np) => {
           if (!alive) return
-          if (np.configured && 'playing' in np && np.track) setData({ np, at: Date.now() })
-          else setHidden(true)
+          if (np.configured && 'playing' in np && np.track) {
+            setData({ np, at: Date.now() })
+            setHidden(false)
+          } else if (!np.configured) setHidden(true)
+          // A Spotify error keeps the last song on screen; the next round tries again.
         })
-        .catch(() => alive && setHidden(true))
+        .catch(() => {})
         .finally(() => {
-          if (alive) timer = window.setTimeout(load, POLL_MS)
+          busy = false
+          if (!alive) return
+          timer = window.setTimeout(load, POLL_MS)
         })
     }
     const io = new IntersectionObserver(
@@ -48,11 +56,14 @@ export function Spotify() {
     io.observe(el)
     const onVis = () => !document.hidden && load()
     document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('focus', onVis)
+    reload.current = load
     return () => {
       alive = false
       io.disconnect()
       window.clearTimeout(timer)
       document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('focus', onVis)
     }
   }, [])
 
@@ -63,6 +74,14 @@ export function Spotify() {
     const id = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(id)
   }, [playing])
+
+  // Ask again right after the current song should end, so the next one shows up at once.
+  useEffect(() => {
+    if (!data?.np.playing || !data.np.track) return
+    const left = data.np.track.durationMs - data.np.progressMs
+    const id = window.setTimeout(() => reload.current(), Math.max(1000, left + 1500))
+    return () => window.clearTimeout(id)
+  }, [data])
 
   if (hidden) return null
   const track = data?.np.track ?? null
@@ -92,8 +111,30 @@ const ticketNo = (url: string) => {
 
 const mono = 'font-mono uppercase tracking-[.1em]'
 
-// The song as a concert ticket (the stub tears away a little on hover): a deep-teal stub, then the cover, the song, and a QR
-// code that opens it in Spotify.
+// The torn edge between stub and ticket: a ragged line of small teeth (fixed, so the server and the
+// browser draw the same one). At rest both edges are straight; on hover they tear.
+const TEETH = Array.from({ length: 30 }, (_, i) => Math.round(((Math.sin(i * 12.9898) * 43758.5453) % 1 + 1) % 1 * 8))
+const edge = (side: 'stub' | 'body', torn: boolean) => {
+  const n = TEETH.length - 1
+  const pts = TEETH.map((d, i) => {
+    const y = `${((i / n) * 100).toFixed(2)}%`
+    return side === 'stub' ? `calc(100% - ${torn ? d : 0}px) ${y}` : `${torn ? 8 - d : 0}px ${y}`
+  })
+  return side === 'stub' ? `polygon(0 0, ${pts.join(', ')}, 0 100%)` : `polygon(${pts[0]}, 100% 0, 100% 100%, ${pts.reverse().join(', ')})`
+}
+
+// Paper crumbs that fly off the top of the tear: [x, y, size, colour].
+const CRUMBS: [number, number, number, string][] = [
+  [-10, -14, 3, 'bg-sand'],
+  [-3, -22, 2, 'bg-sand'],
+  [4, -11, 3, 'bg-deep'],
+  [9, -19, 2, 'bg-sand'],
+  [-14, -6, 2, 'bg-deep'],
+  [13, -8, 2, 'bg-sand'],
+]
+
+// The song as a concert ticket (the stub tears away on hover, leaving a ragged edge and a few
+// crumbs): a deep-teal stub, then the cover, the song, and a QR code that opens it in Spotify.
 function Ticket({ track, playing, progress, playedAt }: { track: Track; playing: boolean; progress: number; playedAt: number | null }) {
   return (
     <a
@@ -101,9 +142,13 @@ function Ticket({ track, playing, progress, playedAt }: { track: Track; playing:
       target="_blank"
       rel="noreferrer"
       aria-label={`${track.title} by ${track.artists}, open in Spotify`}
-      className="group grid w-full max-w-[920px] grid-cols-[clamp(56px,11vw,128px)_minmax(0,1fr)] text-deep no-underline drop-shadow-[0_18px_28px_rgba(17,48,46,.5)]"
+      style={{ '--stub': 'clamp(56px,11vw,128px)' } as CSSProperties}
+      className="group relative grid w-full max-w-[920px] grid-cols-[var(--stub)_minmax(0,1fr)] text-deep no-underline drop-shadow-[0_18px_28px_rgba(17,48,46,.5)]"
     >
-      <div style={notch('right')} className="flex origin-bottom-right flex-col items-center justify-between rounded-l-[14px] border-r-[3px] border-dashed border-sand bg-deep py-6 text-sand transition-[translate,rotate] duration-700 ease-[cubic-bezier(.3,1.25,.4,1)] group-hover:-translate-x-1.5 group-hover:-rotate-[5deg] motion-reduce:transition-none">
+      <div
+        style={{ ...notch('right'), '--rest': edge('stub', false), '--torn': edge('stub', true) } as CSSProperties}
+        className="ticket-tear flex origin-bottom-right flex-col items-center justify-between rounded-l-[14px] border-r-[3px] border-dashed border-sand bg-deep py-6 text-sand group-hover:-translate-x-1.5 group-hover:-rotate-[5deg]"
+      >
         <span className={`${mono} text-[11px] max-sm:[writing-mode:vertical-rl]`}>Ticket</span>
         <span className="flex flex-col items-center gap-0.5">
           <span className={`${mono} text-xs text-mint`}>No.</span>
@@ -112,9 +157,19 @@ function Ticket({ track, playing, progress, playedAt }: { track: Track; playing:
         <span className={`${mono} text-[11px] max-sm:[writing-mode:vertical-rl]`}>Admit one</span>
       </div>
 
+      <span aria-hidden className="pointer-events-none absolute top-[14px] left-[var(--stub)]">
+        {CRUMBS.map(([x, y, size, color], i) => (
+          <span
+            key={i}
+            style={{ '--x': `${x}px`, '--y': `${y}px`, width: size, height: size, transitionDelay: `${120 + i * 40}ms` } as CSSProperties}
+            className={`ticket-crumb absolute ${color}`}
+          />
+        ))}
+      </span>
+
       <div
-        style={notch('left')}
-        className="grid origin-bottom-left grid-cols-[auto_minmax(0,1fr)_auto] items-center transition-[translate,rotate] duration-700 ease-[cubic-bezier(.3,1.25,.4,1)] group-hover:translate-x-1 group-hover:rotate-[1deg] motion-reduce:transition-none gap-[clamp(16px,2.4vw,28px)] rounded-r-[14px] bg-sand py-[clamp(18px,2.4vw,26px)] pr-[clamp(16px,2.2vw,24px)] pl-[clamp(20px,2.6vw,28px)] max-md:grid-cols-[minmax(0,1fr)]"
+        style={{ ...notch('left'), '--rest': edge('body', false), '--torn': edge('body', true) } as CSSProperties}
+        className="ticket-tear grid origin-bottom-left grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[clamp(16px,2.4vw,28px)] rounded-r-[14px] bg-sand py-[clamp(18px,2.4vw,26px)] pr-[clamp(16px,2.2vw,24px)] pl-[clamp(20px,2.6vw,28px)] group-hover:translate-x-1 group-hover:rotate-[1deg] max-md:grid-cols-[minmax(0,1fr)]"
       >
         <Cover src={track.image} alt={`${track.album} cover`} />
 
@@ -175,7 +230,7 @@ function Eq({ playing }: { playing: boolean }) {
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className={`w-[3px] origin-bottom bg-teal-2 ${playing ? 'eq-bar h-3' : 'h-1'}`}
+          className={`w-[3px] origin-bottom bg-teal-2 ${playing ? 'eq-bar keep-motion h-3' : 'h-1'}`}
           style={playing ? { animationDelay: `${-i * 0.27}s` } : undefined}
         />
       ))}

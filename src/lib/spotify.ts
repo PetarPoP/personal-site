@@ -173,7 +173,8 @@ async function fetchNowPlaying(): Promise<NowPlaying> {
   }
 }
 
-export const getNowPlaying = createServerFn({ method: 'GET' }).handler(async (): Promise<NowPlaying> => {
+// POST so no browser or cache in between ever answers with an old song.
+export const getNowPlaying = createServerFn({ method: 'POST' }).handler(async (): Promise<NowPlaying> => {
   // Shared by every visitor, so Spotify is asked at most every 15 seconds per server instance.
   if (!cached || Date.now() - cached.at >= CACHE_MS) {
     let data: NowPlaying
