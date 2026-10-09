@@ -26,7 +26,7 @@ With the repo connected in Cloudflare → Workers & Pages (Workers Builds):
 
 - Build command: `npm run build`, deploy command: `npx wrangler deploy`.
 - Secrets go in the Worker's Settings → Variables and Secrets (or `npx wrangler secret put NAME`), never in the repo:
-  `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REFRESH_TOKEN`, `IMMICH_SHARE_URL`. PR previews
+  `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REFRESH_TOKEN`, `GITHUB_TOKEN`, `IMMICH_SHARE_URL`. PR previews
   (`wrangler preview`) don't get them; add them with `npx wrangler preview base-config secret put NAME` if wanted.
 - Storage is the Cloudflare D1 database `personal-site`, bound as `DB` (previews use `personal-site-preview`). It only
   keeps the newest Spotify refresh token (table `kv`, created on first use).
@@ -48,6 +48,8 @@ redirect to the matching section via `public/_redirects`.
 - `src/components/Site.tsx` — the page and its scroll effects; `src/components/Spotify.tsx` — the now-playing player
   (cover dithered into the teal palette); `src/components/Photos.tsx` — the photo grid and viewer (not on the page
   right now).
+- `src/lib/github.ts` — server function that lists the public GitHub repos with `GITHUB_TOKEN` (no scopes needed);
+  a project card links to its `repo` (set in `portfolio.ts`) only while that repo is public.
 - `src/lib/spotify.ts` — server function that asks Spotify; `src/lib/db.ts` — the D1 key/value table.
 - `src/lib/dither.ts` — the ordered-dither drawing for the hero and the bands.
 - `public/petar-popovic-cv-en.pdf`, `public/petar-popovic-cv-hr.pdf` — the CVs linked from Contact.

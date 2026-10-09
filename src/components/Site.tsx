@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight } from 'lucide-react'
 import { profile, projectKinds, projects, timeline } from '#/data/portfolio'
+import { getRepos } from '#/lib/github'
+import type { Repo } from '#/lib/github'
 import type { ProjectKind } from '#/data/portfolio'
 import Lenis from 'lenis'
 import { drawBand, drawHero } from '#/lib/dither'
@@ -237,6 +239,18 @@ function Work() {
   const [kind, setKind] = useState<ProjectKind | 'all'>('all')
   const filters: [ProjectKind | 'all', string][] = [['all', 'All'], ...(Object.entries(projectKinds) as [ProjectKind, string][])]
   const shown = projects.filter((p) => kind === 'all' || p.kind === kind)
+  // Until GitHub answers, cards link to the repos named in portfolio.ts; after that, only to
+  // the ones that are public, with when they last changed.
+  const [repos, setRepos] = useState<Record<string, Repo> | null>(null)
+  useEffect(() => {
+    let alive = true
+    getRepos()
+      .then((r) => alive && 'repos' in r && setRepos(r.repos))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
   return (
     <section id="work" className="flex scroll-mt-24 flex-col gap-[clamp(36px,6vw,88px)]">
       <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-5">
@@ -264,12 +278,35 @@ function Work() {
             <h3 className="m-0 text-[clamp(24px,2.2vw,32px)] leading-[1.05] font-semibold tracking-[-.03em]">{p.name}</h3>
             <p className="m-0 text-base leading-normal text-pretty text-muted">{p.desc}</p>
             <span className="text-sm text-muted/80">{p.stack}</span>
+            <Code repo={p.repo} live={repos} />
           </article>
         ))}
       </div>
     </section>
   )
 }
+
+function Code({ repo, live }: { repo?: string; live: Record<string, Repo> | null }) {
+  if (!repo) return null
+  const info = live?.[repo.toLowerCase()]
+  if (live && !info) return null
+  return (
+    <span className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <a
+        href={info?.url ?? `${profile.github.replace(/\/+$/, '')}/${repo}`}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-1 text-[15px] font-medium text-ink underline decoration-1 underline-offset-4 transition-colors hover:text-teal"
+      >
+        Code on GitHub
+        <ArrowUpRight size={16} strokeWidth={1.75} />
+      </a>
+      {info && <span className="text-sm text-muted/80">updated {month(info.pushed)}</span>}
+    </span>
+  )
+}
+
+const month = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
 
 function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement | null>; markRef: React.RefObject<HTMLDivElement | null> }) {
   const links = [

@@ -19,7 +19,8 @@ export const profile = {
 export type ProjectKind = 'embedded' | 'web' | 'iot'
 export const projectKinds: Record<ProjectKind, string> = { embedded: 'Embedded', web: 'Web', iot: 'IoT' }
 
-export type Project = { name: string; kind: ProjectKind; stack: string; desc: string }
+// `repo` is the repository's name under profile.github, for projects whose code is public.
+export type Project = { name: string; kind: ProjectKind; stack: string; desc: string; repo?: string }
 
 // "Key projects" from the CV.
 export const projects: Project[] = [
@@ -40,24 +41,28 @@ export const projects: Project[] = [
     kind: 'web',
     stack: 'TanStack Start · React · TS',
     desc: 'Website for the FESB Racing Formula Student team.',
+    repo: 'fesb-racing-site',
   },
   {
     name: 'OBD BLE monitor',
     kind: 'embedded',
     stack: 'C · ESP32 · React Native',
     desc: 'Car diagnostics read over OBD and streamed to a phone over Bluetooth LE.',
+    repo: 'esp32-obd',
   },
   {
     name: 'STM32 embedded tasks',
     kind: 'embedded',
     stack: 'C · STM32 · Wokwi',
     desc: 'Embedded programming exercises on STM32, simulated in Wokwi.',
+    repo: 'FESB_racing',
   },
   {
     name: 'IdeaPlanner',
     kind: 'web',
     stack: 'Next.js · Tauri · Rust',
     desc: 'Desktop app for planning and organising ideas.',
+    repo: 'IdeaPlanner',
   },
   {
     name: 'Smart city model',
@@ -70,6 +75,7 @@ export const projects: Project[] = [
     kind: 'web',
     stack: 'React · Express · MongoDB',
     desc: 'Full-stack web app for a coffee shop.',
+    repo: 'coffe-page',
   },
   {
     name: 'Student jobs portal',
