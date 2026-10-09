@@ -35,15 +35,17 @@ export function Site() {
     let lastBands = 0
     let dirty = true
     let phase = 0
-    let top0: number | null = null
+    let top0 = 0
+    let h1Bottom = 0
 
     const measure = () => {
       const h = h1Ref.current
-      if (!h) return
-      const prev = h.style.transform
-      h.style.transform = 'none'
-      top0 = h.offsetTop + h.offsetHeight + Math.max(24, window.innerHeight * 0.04)
-      h.style.transform = prev
+      const pn = panelRef.current
+      if (!h || !pn) return
+      // The panel's resting place comes from CSS (it sits under the heading), so nothing moves on load.
+      pn.style.margin = ''
+      h1Bottom = h.offsetTop + h.offsetHeight
+      top0 = pn.offsetTop
       onScroll()
     }
 
@@ -51,18 +53,12 @@ export function Site() {
       const H = window.innerHeight
       const p = ease(clamp01(window.scrollY / (H * 0.85)))
       const pad = 16 * (1 - p)
-      const top = (top0 ?? H * 0.46) * (1 - p)
       const pn = panelRef.current
-      const c = heroRef.current
       const h = h1Ref.current
+      // Scrolling grows the panel to fill the screen; margins pull it up over the heading's space.
       if (pn) {
-        pn.style.top = `${top}px`
-        pn.style.left = pn.style.right = pn.style.bottom = `${pad}px`
-        pn.style.borderWidth = 1 - p > 0.02 ? '1px' : '0'
-      }
-      if (c) {
-        c.style.left = `${-pad - 1}px`
-        c.style.top = `${-top - 1}px`
+        pn.style.margin = p > 0 ? `${top0 * (1 - p) - h1Bottom}px ${pad}px ${pad}px` : ''
+        pn.style.borderWidth = 1 - p > 0.02 ? '' : '0'
       }
       if (h) {
         h.style.transform = `translateY(${-p * H * 0.35}px)`
@@ -138,10 +134,10 @@ export function Site() {
     <main className="relative bg-sand text-ink">
       <Nav navRef={navRef} />
 
-      <div id="top" data-tone="light" className="sticky top-0 z-0 h-svh overflow-hidden bg-sand">
+      <div id="top" data-tone="light" className="sticky top-0 z-0 flex h-svh flex-col overflow-clip bg-sand">
         <h1
           ref={h1Ref}
-          className="m-0 px-4 pt-[clamp(88px,13vh,150px)] text-center text-[clamp(46px,8.4vw,168px)] leading-[.92] font-semibold tracking-[-.035em] will-change-[transform,opacity]"
+          className="m-0 shrink-0 px-4 pt-[clamp(88px,13vh,150px)] text-center text-[clamp(46px,8.4vw,168px)] leading-[.92] font-semibold tracking-[-.035em] will-change-[transform,opacity]"
         >
           {/* The name leads the page's main heading for search engines and screen readers. */}
           <span className="sr-only">{profile.name}, </span>
@@ -149,8 +145,9 @@ export function Site() {
           <br />
           {profile.headline[1]}
         </h1>
-        <div ref={panelRef} data-tone="dark" className="absolute top-[46vh] right-4 bottom-4 left-4 overflow-hidden border border-ink bg-teal">
-          <canvas ref={heroRef} aria-hidden className="pixelated absolute top-0 left-0 h-lvh w-screen" />
+        {/* The canvas is placed against the whole screen (#top) and clipped to the panel. */}
+        <div ref={panelRef} data-tone="dark" className="mx-4 mt-[max(24px,4vh)] mb-4 min-h-0 flex-1 border border-ink bg-teal [clip-path:inset(0)]">
+          <canvas ref={heroRef} aria-hidden className="pixelated pointer-events-none absolute top-0 left-0 h-lvh w-screen" />
         </div>
       </div>
 
@@ -226,11 +223,11 @@ function Nav({ navRef }: { navRef: React.RefObject<HTMLElement | null> }) {
         <a href="#work" className={link}>
           Work
         </a>
-        <a href="#music" className={`${link} max-sm:hidden`}>
-          Music
-        </a>
         <a href="#experience" className={`${link} max-sm:hidden`}>
           Experience
+        </a>
+        <a href="#music" className={`${link} max-sm:hidden`}>
+          Music
         </a>
         <a href={`mailto:${profile.email}`} className={`${link} flex items-center gap-1.5`}>
           <ArrowUpRight size={18} strokeWidth={1.75} />
@@ -287,7 +284,7 @@ function Work() {
               aria-pressed={kind === id}
               onClick={() => setKind(id)}
               className={`cursor-pointer border-0 border-b-2 bg-transparent py-1.5 text-base font-medium transition-colors hover:text-teal ${
-                kind === id ? 'border-teal text-teal' : 'border-transparent text-ink'
+                kind === id ? 'border-teal text-teal-2' : 'border-transparent text-ink'
               }`}
             >
               {label}
@@ -298,7 +295,7 @@ function Work() {
       <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] gap-x-[clamp(32px,4vw,56px)] gap-y-[clamp(36px,5vw,72px)]">
         {shown.map((p) => (
           <article key={p.name} className="rise flex flex-col gap-3">
-            <span className={`text-sm font-medium ${p.kind === 'iot' ? 'text-coral' : 'text-teal'}`}>{projectKinds[p.kind]}</span>
+            <span className={`text-sm font-medium ${p.kind === 'iot' ? 'text-coral-2' : 'text-teal-2'}`}>{projectKinds[p.kind]}</span>
             <h3 className="m-0 text-[clamp(24px,2.2vw,32px)] leading-[1.05] font-semibold tracking-[-.03em]">{p.name}</h3>
             <p className="m-0 text-base leading-normal text-pretty text-muted">{p.desc}</p>
             <span className="text-sm text-muted/80">{p.stack}</span>
@@ -340,12 +337,13 @@ function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement
   ]
   return (
     // Top padding = the space from Work to "Where I've been" (sand padding + band), so the
-    // headings are evenly spaced.
+    // headings are evenly spaced. overflow-clip, not hidden: a hidden box can still be scrolled by
+    // an anchor jump (#music at the page bottom slid the footer up and showed a strip under the name).
     <footer
       id="contact"
       data-tone="dark"
       ref={footRef}
-      className="relative flex scroll-mt-24 flex-col gap-[clamp(80px,14vw,200px)] overflow-hidden bg-teal pt-[calc(clamp(56px,9vw,150px)+clamp(220px,44vw,700px))] pb-3 text-paper"
+      className="relative flex scroll-mt-24 flex-col gap-[clamp(80px,14vw,200px)] overflow-clip bg-teal pt-[calc(clamp(56px,9vw,150px)+clamp(220px,44vw,700px))] pb-3 text-paper"
     >
       <canvas data-dither="#e9dfca,#c9c0ad,#2f8f8a,#22706c,#1d4f4c" data-mode="foot" aria-hidden className="pixelated absolute inset-0 h-full w-full" />
       <div className="relative z-[1] flex flex-wrap items-end justify-between gap-[clamp(28px,4vw,64px)] px-[clamp(20px,6vw,110px)]">
