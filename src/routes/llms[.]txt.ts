@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { llmsText, textResponse } from '#/lib/llms'
+import { llmsIndex, textResponse } from '#/lib/llms'
 
-// /llms.txt: the whole site as Markdown for AI assistants (see src/lib/llms.ts).
+// /llms.txt: an llmstxt.org index of the site for AI assistants (see src/lib/llms.ts).
 export const Route = createFileRoute('/llms.txt')({
-  server: { handlers: { GET: () => textResponse(llmsText()) } },
+  server: { handlers: { GET: () => textResponse(llmsIndex()) } },
 })

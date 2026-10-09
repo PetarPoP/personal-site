@@ -37,13 +37,9 @@ export const Route = createRootRoute({
       { rel: 'icon', href: '/favicon.svg?v=3', type: 'image/svg+xml' },
       { rel: 'icon', href: '/favicon-32.png?v=3', type: 'image/png', sizes: '32x32' },
       { rel: 'apple-touch-icon', href: '/apple-touch-icon.png?v=3' },
-      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-      { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
-      {
-        rel: 'stylesheet',
-        href: 'https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&family=JetBrains+Mono:wght@400;600&display=swap',
-      },
       { rel: 'stylesheet', href: appCss },
+      // The heading font starts downloading with the page instead of after the stylesheet.
+      { rel: 'preload', href: '/fonts/instrument-sans-latin-wght-normal.woff2', as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' },
       // The whole site as plain text for AI assistants.
       { rel: 'alternate', type: 'text/markdown', href: '/llms.txt', title: 'Petar Popović (plain text for AI assistants)' },
     ],
