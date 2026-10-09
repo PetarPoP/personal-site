@@ -7,8 +7,12 @@
   "assets": {
     "html_handling": "drop-trailing-slash"
   },
+  // Small saved values: the newest Spotify refresh token (src/lib/db.ts).
+  "d1_databases": [{ "binding": "DB", "database_name": "personal-site", "database_id": "f0e35f3a-97ca-416f-8cfe-3dec4a56d82b" }],
   "observability": { "enabled": true },
-  // PR branches are deployed with `wrangler preview`, which requires this block. Previews need no
-  // separate settings; IMMICH_SHARE_URL can be set for them with `wrangler preview base-config secret put`.
-  "previews": {}
+  // PR branches are deployed with `wrangler preview`, which requires this block and must not touch
+  // the production database. Secrets for previews: `wrangler preview base-config secret put NAME`.
+  "previews": {
+    "d1_databases": [{ "binding": "DB", "database_name": "personal-site-preview", "database_id": "9ecc25de-40ee-417f-b03a-6177050734b6" }]
+  }
 }

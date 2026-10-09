@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight } from 'lucide-react'
 import { profile, projectKinds, projects, timeline } from '#/data/portfolio'
 import type { ProjectKind } from '#/data/portfolio'
+import Lenis from 'lenis'
 import { drawBand, drawHero } from '#/lib/dither'
-import { Photos } from './Photos'
+import { Spotify } from './Spotify'
 
 const ease = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2)
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
@@ -97,6 +98,9 @@ export function Site() {
       if (heroRef.current && heroVisible()) drawHero(heroRef.current, t, phase, px())
     }
 
+    // Smooth wheel scrolling (touch keeps the phone's own scrolling). Anchor links glide too.
+    const lenis = reduce ? null : new Lenis({ autoRaf: true, anchors: { offset: -16 } })
+
     const onResize = () => measure()
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onResize)
@@ -105,6 +109,7 @@ export function Site() {
     raf = requestAnimationFrame(loop)
     return () => {
       cancelAnimationFrame(raf)
+      lenis?.destroy()
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onResize)
     }
@@ -136,12 +141,11 @@ export function Site() {
         <div className="flex flex-col gap-[clamp(96px,16vw,240px)] bg-sand px-[clamp(20px,6vw,110px)] py-[clamp(56px,9vw,150px)]">
           <Intro />
           <Work />
-          <Photos />
         </div>
 
         <Band colors="#e9dfca,#e2d8c4,#c9c0ad,#2f8f8a" className="h-[clamp(220px,44vw,700px)]" />
 
-        <section className="relative bg-deep px-[clamp(20px,6vw,110px)] py-[clamp(110px,18vw,280px)] text-paper">
+        <section className="relative flex flex-col gap-[clamp(120px,16vw,240px)] bg-deep px-[clamp(20px,6vw,110px)] py-[clamp(110px,18vw,280px)] text-paper">
           <canvas data-dither="#2f8f8a,#22706c,#1d4f4c" data-mode="field" aria-hidden className="pixelated absolute inset-0 h-full w-full" />
           <div id="experience" className="relative z-[1] flex scroll-mt-24 flex-col gap-[clamp(40px,6vw,88px)]">
             <h2 className="heading">Where I've been</h2>
@@ -157,6 +161,9 @@ export function Site() {
                 </div>
               ))}
             </div>
+          </div>
+          <div id="music" className="relative z-[1] scroll-mt-24">
+            <Spotify />
           </div>
         </section>
 
@@ -193,8 +200,8 @@ function Nav() {
         <a href="#work" className={link}>
           Work
         </a>
-        <a href="#photos" className={`${link} max-sm:hidden`}>
-          Photos
+        <a href="#music" className={`${link} max-sm:hidden`}>
+          Music
         </a>
         <a href="#experience" className={`${link} max-sm:hidden`}>
           Experience
