@@ -57,7 +57,8 @@ export function Site() {
       const h = h1Ref.current
       // Scrolling grows the panel to fill the screen; margins pull it up over the heading's space.
       if (pn) {
-        pn.style.margin = p > 0 ? `${top0 * (1 - p) - h1Bottom}px ${pad}px ${pad}px` : ''
+        // The bottom margin keeps the resting gap above the phone's toolbar, then closes to 0.
+        pn.style.margin = p > 0 ? `${top0 * (1 - p) - h1Bottom}px ${pad}px calc((100lvh - 100svh) * ${1 - p} + ${pad}px)` : ''
         pn.style.borderWidth = 1 - p > 0.02 ? '' : '0'
       }
       if (h) {
@@ -115,6 +116,7 @@ export function Site() {
 
     // Smooth wheel scrolling (touch keeps the phone's own scrolling). Anchor links glide too.
     const lenis = reduce ? null : new Lenis({ autoRaf: true, anchors: { offset: -16 } })
+    smooth = lenis
 
     const onResize = () => measure()
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -125,6 +127,7 @@ export function Site() {
     return () => {
       cancelAnimationFrame(raf)
       lenis?.destroy()
+      smooth = null
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onResize)
     }
@@ -134,7 +137,9 @@ export function Site() {
     <main className="relative bg-sand text-ink">
       <Nav navRef={navRef} />
 
-      <div id="top" data-tone="light" className="sticky top-0 z-0 flex h-svh flex-col overflow-clip bg-sand">
+      {/* lvh, not svh: when a phone hides its address bar the screen grows, and an svh-tall hero
+          left a cream strip under it that showed before the next section arrived. */}
+      <div id="top" data-tone="light" className="sticky top-0 z-0 flex h-lvh flex-col overflow-clip bg-sand">
         <h1
           ref={h1Ref}
           className="m-0 shrink-0 px-4 pt-[clamp(88px,13vh,150px)] text-center text-[clamp(46px,8.4vw,168px)] leading-[.92] font-semibold tracking-[-.035em] will-change-[transform,opacity]"
@@ -146,7 +151,7 @@ export function Site() {
           {profile.headline[1]}
         </h1>
         {/* The canvas is placed against the whole screen (#top) and clipped to the panel. */}
-        <div ref={panelRef} data-tone="dark" className="mx-4 mt-[max(24px,4vh)] mb-4 min-h-0 flex-1 border border-ink bg-teal [clip-path:inset(0)]">
+        <div ref={panelRef} data-tone="dark" className="mx-4 mt-[max(24px,4vh)] mb-[calc(100lvh-100svh+16px)] min-h-0 flex-1 border border-ink bg-teal [clip-path:inset(0)]">
           <canvas ref={heroRef} aria-hidden className="pixelated pointer-events-none absolute top-0 left-0 h-lvh w-screen" />
         </div>
       </div>
@@ -204,6 +209,16 @@ function Logo({ className = '' }: { className?: string }) {
   )
 }
 
+// The page's smooth scroller, so the nav's name can glide back to the top.
+let smooth: Lenis | null = null
+
+// The name goes back to the top. Not a #top link: #top is sticky, so it is always "here".
+const toTop = (e: React.MouseEvent) => {
+  e.preventDefault()
+  if (smooth) smooth.scrollTo(0)
+  else window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+}
+
 function Nav({ navRef }: { navRef: React.RefObject<HTMLElement | null> }) {
   const link = 'pointer-events-auto transition-opacity hover:opacity-60'
   return (
@@ -215,7 +230,7 @@ function Nav({ navRef }: { navRef: React.RefObject<HTMLElement | null> }) {
       {/* A soft fade behind the links, dark over dark sections and cream over light ones. */}
       <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-[170%] bg-linear-to-b from-sand/90 via-sand/60 to-transparent transition-opacity duration-300 group-data-[tone=dark]/nav:opacity-0" />
       <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-[170%] bg-linear-to-b from-[#0d2624]/55 via-[#0d2624]/25 to-transparent opacity-0 transition-opacity duration-300 group-data-[tone=dark]/nav:opacity-100" />
-      <a href="#top" className={`${link} flex items-center gap-2.5 font-semibold`}>
+      <a href="/" onClick={toTop} className={`${link} flex items-center gap-2.5 font-semibold`}>
         <Logo />
         {profile.name}
       </a>
