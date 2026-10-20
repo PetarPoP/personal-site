@@ -382,10 +382,14 @@ function Code({ project: p }: { project: RankedProject }) {
 const month = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
 
 function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement | null>; markRef: React.RefObject<HTMLDivElement | null> }) {
-  const links = [
-    { label: 'Email me', href: `mailto:${profile.email}`, onClick: openContact },
-    { label: 'GitHub', href: profile.github, onClick: undefined },
-    ...profile.cvs.map((c) => ({ label: c.label, href: c.href, onClick: undefined })),
+  // On phones each group gets its own row; wider screens put them all on one line.
+  const groups = [
+    [{ label: 'Email me', href: `mailto:${profile.email}`, onClick: openContact }],
+    [
+      { label: 'GitHub', href: profile.github, onClick: undefined },
+      { label: 'LinkedIn', href: profile.linkedin, onClick: undefined },
+    ],
+    profile.cvs.map((c) => ({ label: c.label, href: c.href, onClick: undefined })),
   ]
   return (
     // Top padding = the space from Work to "Where I've been" (sand padding + band), so the
@@ -400,17 +404,21 @@ function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement
       <canvas data-dither="#e9dfca,#c9c0ad,#2f8f8a,#22706c,#1d4f4c" data-mode="foot" aria-hidden className="pixelated absolute inset-0 h-full w-full" />
       <div className="relative z-[1] flex flex-wrap items-end justify-between gap-[clamp(28px,4vw,64px)] px-[clamp(20px,6vw,110px)]">
         <p className="heading m-0 max-w-[16ch] flex-[1_1_640px] text-[clamp(44px,6.4vw,112px)]">Hiring an engineer? Let's talk.</p>
-        <div className="flex flex-wrap gap-x-9 gap-y-4">
-          {links.map((l) => (
-            <a
-              key={l.label}
-              href={l.href}
-              onClick={l.onClick}
-              {...(l.href.startsWith('http') ? { target: '_blank', rel: 'noreferrer' } : {})}
-              className="text-[clamp(20px,1.8vw,26px)] font-semibold tracking-[-.02em] text-paper underline decoration-2 underline-offset-[6px] transition-opacity hover:opacity-70"
-            >
-              {l.label}
-            </a>
+        <div className="flex flex-col gap-x-9 gap-y-4 sm:flex-row sm:flex-wrap">
+          {groups.map((links) => (
+            <div key={links[0].label} className="flex flex-wrap gap-x-9 gap-y-4">
+              {links.map((l) => (
+                <a
+                  key={l.label}
+                  href={l.href}
+                  onClick={l.onClick}
+                  {...(l.href.startsWith('http') ? { target: '_blank', rel: 'noreferrer' } : {})}
+                  className="text-[clamp(20px,1.8vw,26px)] font-semibold tracking-[-.02em] text-paper underline decoration-2 underline-offset-[6px] transition-opacity hover:opacity-70"
+                >
+                  {l.label}
+                </a>
+              ))}
+            </div>
           ))}
         </div>
       </div>
