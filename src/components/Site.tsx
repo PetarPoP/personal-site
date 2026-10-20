@@ -28,20 +28,6 @@ export function Site() {
   const onPlaying = useCallback((p: boolean) => {
     playingRef.current = p
   }, [])
-  // The page holds still while the contact form is open, and is put back exactly where it was
-  // when the form closes: hiding the page's overflow made some phones jump back to the top.
-  const lockedAt = useRef(0)
-  const onLock = useCallback((locked: boolean) => {
-    if (locked) {
-      lockedAt.current = window.scrollY
-      smooth?.stop()
-      return
-    }
-    const y = lockedAt.current
-    if (Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y)
-    smooth?.start()
-    smooth?.scrollTo(y, { immediate: true, force: true })
-  }, [])
 
   useEffect(() => {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -174,7 +160,7 @@ export function Site() {
   return (
     <main className="relative bg-sand text-ink">
       <Nav navRef={navRef} />
-      <ContactDialog onLock={onLock} />
+      <ContactDialog />
 
       {/* lvh, not svh: when a phone hides its address bar the screen grows, and an svh-tall hero
           left a cream strip under it that showed before the next section arrived. */}

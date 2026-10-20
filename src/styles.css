@@ -89,9 +89,6 @@
   .lenis.lenis-smooth {
     scroll-behavior: auto !important;
   }
-  .lenis.lenis-stopped {
-    overflow: clip;
-  }
   body {
     margin: 0;
     background: var(--color-sand);
