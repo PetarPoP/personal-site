@@ -83,7 +83,7 @@ export const getProjects = createServerFn({ method: 'GET' }).handler(async (): P
   }
 })
 
-// Contributions per day for the last year, for the small activity graph.
+// Contributions per day for the last year, for the activity graph (Activity.tsx, not on the page right now).
 export type Activity = { total: number; days: { date: string; count: number }[] } | { error: string }
 
 let activityCache: { at: number; activity: Activity } | null = null

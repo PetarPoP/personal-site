@@ -6,6 +6,7 @@ export const profile = {
   location: 'Split, Croatia',
   email: 'petarpopovic0712@gmail.com',
   github: 'https://github.com/PetarPoP',
+  linkedin: 'https://www.linkedin.com/in/petarpop',
   // Pop's other public profiles; search engines use them to tie the site to his name.
   profiles: ['https://www.instagram.com/pop_2110/', 'https://www.instagram.com/pop.perspektiva/'],
   cvs: [
