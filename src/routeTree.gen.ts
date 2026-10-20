@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LlmsFullDottxtRouteImport } from './routes/llms-full[.]txt'
 import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
+import { Route as PetarPopovicCvEnDotpdfRouteImport } from './routes/petar-popovic-cv-en[.]pdf'
+import { Route as PetarPopovicCvHrDotpdfRouteImport } from './routes/petar-popovic-cv-hr[.]pdf'
 import { Route as ApiPhotosIdRouteImport } from './routes/api/photos.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +31,16 @@ const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
   path: '/llms.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PetarPopovicCvEnDotpdfRoute = PetarPopovicCvEnDotpdfRouteImport.update({
+  id: '/petar-popovic-cv-en.pdf',
+  path: '/petar-popovic-cv-en.pdf',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PetarPopovicCvHrDotpdfRoute = PetarPopovicCvHrDotpdfRouteImport.update({
+  id: '/petar-popovic-cv-hr.pdf',
+  path: '/petar-popovic-cv-hr.pdf',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPhotosIdRoute = ApiPhotosIdRouteImport.update({
   id: '/api/photos/$id',
   path: '/api/photos/$id',
@@ -39,12 +51,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/petar-popovic-cv-en.pdf': typeof PetarPopovicCvEnDotpdfRoute
+  '/petar-popovic-cv-hr.pdf': typeof PetarPopovicCvHrDotpdfRoute
   '/api/photos/$id': typeof ApiPhotosIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/petar-popovic-cv-en.pdf': typeof PetarPopovicCvEnDotpdfRoute
+  '/petar-popovic-cv-hr.pdf': typeof PetarPopovicCvHrDotpdfRoute
   '/api/photos/$id': typeof ApiPhotosIdRoute
 }
 export interface FileRoutesById {
@@ -52,20 +68,43 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/petar-popovic-cv-en.pdf': typeof PetarPopovicCvEnDotpdfRoute
+  '/petar-popovic-cv-hr.pdf': typeof PetarPopovicCvHrDotpdfRoute
   '/api/photos/$id': typeof ApiPhotosIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/llms-full.txt' | '/llms.txt' | '/api/photos/$id'
+  fullPaths:
+    | '/'
+    | '/llms-full.txt'
+    | '/llms.txt'
+    | '/petar-popovic-cv-en.pdf'
+    | '/petar-popovic-cv-hr.pdf'
+    | '/api/photos/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/llms-full.txt' | '/llms.txt' | '/api/photos/$id'
-  id: '__root__' | '/' | '/llms-full.txt' | '/llms.txt' | '/api/photos/$id'
+  to:
+    | '/'
+    | '/llms-full.txt'
+    | '/llms.txt'
+    | '/petar-popovic-cv-en.pdf'
+    | '/petar-popovic-cv-hr.pdf'
+    | '/api/photos/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/llms-full.txt'
+    | '/llms.txt'
+    | '/petar-popovic-cv-en.pdf'
+    | '/petar-popovic-cv-hr.pdf'
+    | '/api/photos/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LlmsFullDottxtRoute: typeof LlmsFullDottxtRoute
   LlmsDottxtRoute: typeof LlmsDottxtRoute
+  PetarPopovicCvEnDotpdfRoute: typeof PetarPopovicCvEnDotpdfRoute
+  PetarPopovicCvHrDotpdfRoute: typeof PetarPopovicCvHrDotpdfRoute
   ApiPhotosIdRoute: typeof ApiPhotosIdRoute
 }
 
@@ -92,6 +131,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LlmsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/petar-popovic-cv-en.pdf': {
+      id: '/petar-popovic-cv-en.pdf'
+      path: '/petar-popovic-cv-en.pdf'
+      fullPath: '/petar-popovic-cv-en.pdf'
+      preLoaderRoute: typeof PetarPopovicCvEnDotpdfRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/petar-popovic-cv-hr.pdf': {
+      id: '/petar-popovic-cv-hr.pdf'
+      path: '/petar-popovic-cv-hr.pdf'
+      fullPath: '/petar-popovic-cv-hr.pdf'
+      preLoaderRoute: typeof PetarPopovicCvHrDotpdfRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/photos/$id': {
       id: '/api/photos/$id'
       path: '/api/photos/$id'
@@ -106,6 +159,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LlmsFullDottxtRoute: LlmsFullDottxtRoute,
   LlmsDottxtRoute: LlmsDottxtRoute,
+  PetarPopovicCvEnDotpdfRoute: PetarPopovicCvEnDotpdfRoute,
+  PetarPopovicCvHrDotpdfRoute: PetarPopovicCvHrDotpdfRoute,
   ApiPhotosIdRoute: ApiPhotosIdRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,14 +1,14 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowUpRight } from 'lucide-react'
 import { profile, projectKinds, projects, timeline } from '#/data/portfolio'
-import { getRepos } from '#/lib/github'
-import type { Repo } from '#/lib/github'
+import { getProjects } from '#/lib/github'
+import type { RankedProject } from '#/lib/projects'
 import type { ProjectKind } from '#/data/portfolio'
 import Lenis from 'lenis'
 import { createDither } from '#/lib/dither-renderer'
-
-// The Spotify ticket (and its QR code library) loads separately; it sits at the very bottom.
-const Spotify = lazy(() => import('./Spotify').then((m) => ({ default: m.Spotify })))
+import { Spotify } from './Spotify'
+import { ContactDialog, openContact } from './Contact'
+import { Activity } from './Activity'
 
 const ease = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2)
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
@@ -24,6 +24,17 @@ export function Site() {
   const footRef = useRef<HTMLDivElement>(null)
   const markRef = useRef<HTMLDivElement>(null)
   const navRef = useRef<HTMLElement>(null)
+  // Whether a song is playing right now (Spotify.tsx); the hero's water reacts to it.
+  const playingRef = useRef(false)
+  const onPlaying = useCallback((p: boolean) => {
+    playingRef.current = p
+  }, [])
+  // The page holds still while the contact form is open.
+  const onLock = useCallback((locked: boolean) => {
+    if (locked) smooth?.stop()
+    else smooth?.start()
+    document.documentElement.style.overflow = locked ? 'hidden' : ''
+  }, [])
 
   useEffect(() => {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -102,16 +113,36 @@ export function Site() {
     // The dithered canvases are drawn in a worker where the browser allows it (dither-renderer.ts).
     const dither = createDither(heroRef.current, [...(sheetRef.current?.querySelectorAll<HTMLCanvasElement>('canvas[data-dither]') ?? [])])
 
+    // While music plays the water speeds up and rings spread from the song; `energy` eases
+    // between 0 and 1 over a couple of seconds so the change is never a jump.
+    let last = t0
+    let clock = 0
+    let energy = 0
+    let origin: [number, number] = [0, 1]
+    const findOrigin = () => {
+      const song = panelRef.current?.querySelector('[data-spotify] img, [data-spotify] > span')?.getBoundingClientRect()
+      const cv = heroRef.current?.getBoundingClientRect()
+      if (song && cv && cv.width && cv.height) origin = [(song.left + song.width / 2 - cv.left) / cv.width, (song.top + song.height / 2 - cv.top) / cv.height]
+    }
+
     const loop = (ts: number) => {
       raf = requestAnimationFrame(loop)
-      const t = reduce ? 0 : (ts - t0) / 1000
+      const dt = Math.min(0.1, (ts - last) / 1000)
+      last = ts
+      if (!reduce) {
+        energy += ((playingRef.current ? 1 : 0) - energy) * Math.min(1, dt * 0.9)
+        if (energy < 0.001) energy = 0
+        clock += dt * (1 + energy * 1.4)
+      }
+      const t = clock
       const bands = dirty || (!reduce && ts - lastBands > 66)
       const hero = dirty || (!reduce && ts - lastHero >= 80)
       if (!bands && !hero) return
       if (bands) lastBands = ts
       if (hero) lastHero = ts
       dirty = false
-      dither.frame(t, phase, px(), { bands, hero: hero && heroVisible() })
+      if (energy) findOrigin()
+      dither.frame(t, phase, px(), { bands, hero: hero && heroVisible() }, energy, origin)
     }
 
     // Smooth wheel scrolling (touch keeps the phone's own scrolling). Anchor links glide too.
@@ -136,6 +167,7 @@ export function Site() {
   return (
     <main className="relative bg-sand text-ink">
       <Nav navRef={navRef} />
+      <ContactDialog onLock={onLock} />
 
       {/* lvh, not svh: when a phone hides its address bar the screen grows, and an svh-tall hero
           left a cream strip under it that showed before the next section arrived. */}
@@ -153,6 +185,9 @@ export function Site() {
         {/* The canvas is placed against the whole screen (#top) and clipped to the panel. */}
         <div ref={panelRef} data-tone="dark" className="mx-4 mt-[max(24px,4vh)] mb-[calc(100lvh-100svh+16px)] min-h-0 flex-1 border border-ink bg-teal [clip-path:inset(0)]">
           <canvas ref={heroRef} aria-hidden className="pixelated pointer-events-none absolute top-0 left-0 h-lvh w-screen" />
+          <div className="relative h-full">
+            <Spotify onPlaying={onPlaying} />
+          </div>
         </div>
       </div>
 
@@ -241,10 +276,7 @@ function Nav({ navRef }: { navRef: React.RefObject<HTMLElement | null> }) {
         <a href="#experience" className={`${link} max-sm:hidden`}>
           Experience
         </a>
-        <a href="#music" className={`${link} max-sm:hidden`}>
-          Music
-        </a>
-        <a href={`mailto:${profile.email}`} className={`${link} flex items-center gap-1.5`}>
+        <a href={`mailto:${profile.email}`} onClick={openContact} className={`${link} flex items-center gap-1.5`}>
           <ArrowUpRight size={18} strokeWidth={1.75} />
           Email<span className="max-[380px]:hidden"> me</span>
         </a>
@@ -274,19 +306,19 @@ function Intro() {
 function Work() {
   const [kind, setKind] = useState<ProjectKind | 'all'>('all')
   const filters: [ProjectKind | 'all', string][] = [['all', 'All'], ...(Object.entries(projectKinds) as [ProjectKind, string][])]
-  const shown = projects.filter((p) => kind === 'all' || p.kind === kind)
-  // Until GitHub answers, cards link to the repos named in portfolio.ts; after that, only to
-  // the ones that are public, with when they last changed.
-  const [repos, setRepos] = useState<Record<string, Repo> | null>(null)
+  // The order in portfolio.ts until GitHub answers; then ranked by code and recency, with any
+  // new public repo added (src/lib/projects.ts).
+  const [list, setList] = useState<RankedProject[]>(projects)
   useEffect(() => {
     let alive = true
-    getRepos()
-      .then((r) => alive && 'repos' in r && setRepos(r.repos))
+    getProjects()
+      .then((r) => alive && 'projects' in r && setList(r.projects))
       .catch(() => {})
     return () => {
       alive = false
     }
   }, [])
+  const shown = list.filter((p) => kind === 'all' || p.kind === kind)
   return (
     <section id="work" className="flex scroll-mt-24 flex-col gap-[clamp(36px,6vw,88px)]">
       <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-5">
@@ -314,22 +346,21 @@ function Work() {
             <h3 className="m-0 text-[clamp(24px,2.2vw,32px)] leading-[1.05] font-semibold tracking-[-.03em]">{p.name}</h3>
             <p className="m-0 text-base leading-normal text-pretty text-muted">{p.desc}</p>
             <span className="text-sm text-muted/80">{p.stack}</span>
-            <Code repo={p.repo} live={repos} />
+            <Code project={p} />
           </article>
         ))}
       </div>
+      <Activity />
     </section>
   )
 }
 
-function Code({ repo, live }: { repo?: string; live: Record<string, Repo> | null }) {
-  if (!repo) return null
-  const info = live?.[repo.toLowerCase()]
-  if (live && !info) return null
+function Code({ project: p }: { project: RankedProject }) {
+  if (!p.repo) return null
   return (
     <span className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <a
-        href={info?.url ?? `${profile.github.replace(/\/+$/, '')}/${repo}`}
+        href={p.url ?? `${profile.github.replace(/\/+$/, '')}/${p.repo}`}
         target="_blank"
         rel="noreferrer"
         className="flex items-center gap-1 text-[15px] font-medium text-ink underline decoration-1 underline-offset-4 transition-colors hover:text-teal"
@@ -337,7 +368,7 @@ function Code({ repo, live }: { repo?: string; live: Record<string, Repo> | null
         Code on GitHub
         <ArrowUpRight size={16} strokeWidth={1.75} />
       </a>
-      {info && <span className="text-sm text-muted/80">updated {month(info.pushed)}</span>}
+      {p.pushed && <span className="text-sm text-muted/80">updated {month(p.pushed)}</span>}
     </span>
   )
 }
@@ -346,14 +377,14 @@ const month = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { month
 
 function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement | null>; markRef: React.RefObject<HTMLDivElement | null> }) {
   const links = [
-    { label: 'Email me', href: `mailto:${profile.email}` },
-    { label: 'GitHub', href: profile.github },
-    ...profile.cvs.map((c) => ({ label: c.label, href: c.href })),
+    { label: 'Email me', href: `mailto:${profile.email}`, onClick: openContact },
+    { label: 'GitHub', href: profile.github, onClick: undefined },
+    ...profile.cvs.map((c) => ({ label: c.label, href: c.href, onClick: undefined })),
   ]
   return (
     // Top padding = the space from Work to "Where I've been" (sand padding + band), so the
     // headings are evenly spaced. overflow-clip, not hidden: a hidden box can still be scrolled by
-    // an anchor jump (#music at the page bottom slid the footer up and showed a strip under the name).
+    // an anchor jump (a link to the page bottom once slid the footer up and showed a strip under the name).
     <footer
       id="contact"
       data-tone="dark"
@@ -368,6 +399,7 @@ function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement
             <a
               key={l.label}
               href={l.href}
+              onClick={l.onClick}
               {...(l.href.startsWith('http') ? { target: '_blank', rel: 'noreferrer' } : {})}
               className="text-[clamp(20px,1.8vw,26px)] font-semibold tracking-[-.02em] text-paper underline decoration-2 underline-offset-[6px] transition-opacity hover:opacity-70"
             >
@@ -375,11 +407,6 @@ function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement
             </a>
           ))}
         </div>
-      </div>
-      <div id="music" className="relative z-[1] scroll-mt-24 px-[clamp(20px,6vw,110px)] empty:hidden">
-        <Suspense fallback={null}>
-          <Spotify />
-        </Suspense>
       </div>
       <div className="pointer-events-none relative z-[1] flex flex-col gap-4 px-4">
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-[15px] text-sand">

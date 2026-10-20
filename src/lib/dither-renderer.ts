@@ -5,7 +5,7 @@ import type { Layer } from './dither'
 // (OffscreenCanvas), otherwise on the page itself.
 
 // [id, width, height, top, draw this time] in CSS pixels.
-export type Frame = { type: 'frame'; t: number; phase: number; px: number; vh: number; sizes: [number, number, number, number, boolean][] }
+export type Frame = { type: 'frame'; t: number; phase: number; px: number; vh: number; energy: number; origin: [number, number]; sizes: [number, number, number, number, boolean][] }
 
 type Item = { id: number; el: HTMLCanvasElement; hero: boolean; layer?: Layer }
 
@@ -46,7 +46,8 @@ export function createDither(hero: HTMLCanvasElement | null, bands: HTMLCanvasEl
 
   return {
     // Draws the hero and/or the bands as they are on screen now.
-    frame(t: number, phase: number, px: number, opts: { hero: boolean; bands: boolean }) {
+    // `energy` and `origin` are the hero's music rings (drawHero).
+    frame(t: number, phase: number, px: number, opts: { hero: boolean; bands: boolean }, energy = 0, origin: [number, number] = [0, 1]) {
       const vh = window.innerHeight
       const sizes: Frame['sizes'] = []
       for (const it of items) {
@@ -56,11 +57,11 @@ export function createDither(hero: HTMLCanvasElement | null, bands: HTMLCanvasEl
         if (!it.hero && (r.bottom < 0 || r.top > vh)) continue
         if (it.layer) {
           Object.assign(it.layer, { W: r.width, H: r.height, top: r.top })
-          if (it.hero) drawHero(it.layer, t, phase, px)
+          if (it.hero) drawHero(it.layer, t, phase, px, energy, origin)
           else drawBand(it.layer, t, vh, px)
         } else sizes.push([it.id, r.width, r.height, r.top, true])
       }
-      if (w && sizes.length) w.postMessage({ type: 'frame', t, phase, px, vh, sizes } satisfies Frame)
+      if (w && sizes.length) w.postMessage({ type: 'frame', t, phase, px, vh, energy, origin, sizes } satisfies Frame)
     },
   }
 }
