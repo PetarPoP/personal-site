@@ -16,7 +16,7 @@ export const openContact = (e?: React.MouseEvent) => {
 
 type State = 'idle' | 'sending' | 'sent'
 
-export function ContactDialog({ onLock }: { onLock: (locked: boolean) => void }) {
+export function ContactDialog() {
   const [mounted, setMounted] = useState(false)
   const [shown, setShown] = useState(false)
   const [state, setState] = useState<State>('idle')
@@ -38,15 +38,13 @@ export function ContactDialog({ onLock }: { onLock: (locked: boolean) => void })
   // Mounted first, then shown on the next frame, so the entrance animates.
   useEffect(() => {
     if (!mounted) return
-    onLock(true)
     const id = requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)))
     const t = window.setTimeout(() => panel.current?.querySelector<HTMLElement>('input:not([tabindex="-1"])')?.focus({ preventScroll: true }), 120)
     return () => {
       cancelAnimationFrame(id)
       window.clearTimeout(t)
-      onLock(false)
     }
-  }, [mounted, onLock])
+  }, [mounted])
 
   const close = () => {
     setShown(false)
@@ -58,15 +56,21 @@ export function ContactDialog({ onLock }: { onLock: (locked: boolean) => void })
     }, 380)
   }
 
-  // Touch scrolling outside the form must not move the page underneath.
+  // The page underneath must not scroll while the form is open. Only wheel and touch scrolling
+  // outside the form are blocked: stopping Lenis or hiding the page's overflow instead made
+  // Safari lose the scroll position and jump to the top when the form closed.
   useEffect(() => {
     const el = root.current
     if (!mounted || !el) return
-    const onMove = (e: TouchEvent) => {
+    const block = (e: Event) => {
       if (!panel.current?.contains(e.target as Node)) e.preventDefault()
     }
-    el.addEventListener('touchmove', onMove, { passive: false })
-    return () => el.removeEventListener('touchmove', onMove)
+    el.addEventListener('wheel', block, { passive: false })
+    el.addEventListener('touchmove', block, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', block)
+      el.removeEventListener('touchmove', block)
+    }
   }, [mounted])
 
   useEffect(() => {
