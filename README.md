@@ -3,7 +3,7 @@
 Personal CV / portfolio site built with [TanStack Start](https://tanstack.com/start) and Tailwind CSS v4.
 It is one scrolling page: a hero whose dithered teal "water" grows to fill the screen as you scroll (with what Petar
 is listening to on Spotify at its bottom; the water speeds up and ripples while a song plays), then Work (every
-public project, ranked, plus a small GitHub activity graph), Experience, and Contact (a form that emails Petar), with dithered
+public project, ranked), Experience, and Contact (a form that emails Petar), with dithered
 bands blending each section into the next. Wheel scrolling is smoothed with [Lenis](https://github.com/darkroomengineering/lenis)
 and the scrollbar is hidden. It works the same on phones; the dither uses bigger pixels there.
 
@@ -60,7 +60,7 @@ redirect to the matching section via `public/_redirects`.
 
 - `src/data/portfolio.ts` — all copy: profile, projects, experience and education.
 - `src/components/Site.tsx` — the page and its scroll effects; `src/components/Spotify.tsx` — the now-playing strip
-  on the hero; `src/components/Contact.tsx` — the contact form; `src/components/Activity.tsx` — the GitHub graph;
+  on the hero; `src/components/Contact.tsx` — the contact form; `src/components/Activity.tsx` — the GitHub graph (not on the page right now);
   `src/components/Photos.tsx` — the photo grid and viewer (not on the page
   right now).
 - `src/lib/github.ts` — server functions for the public GitHub repos (with their code size per language) and the

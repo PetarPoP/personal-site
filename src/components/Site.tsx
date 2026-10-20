@@ -8,7 +8,6 @@ import Lenis from 'lenis'
 import { createDither } from '#/lib/dither-renderer'
 import { Spotify } from './Spotify'
 import { ContactDialog, openContact } from './Contact'
-import { Activity } from './Activity'
 
 const ease = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2)
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
@@ -29,11 +28,19 @@ export function Site() {
   const onPlaying = useCallback((p: boolean) => {
     playingRef.current = p
   }, [])
-  // The page holds still while the contact form is open.
+  // The page holds still while the contact form is open, and is put back exactly where it was
+  // when the form closes: hiding the page's overflow made some phones jump back to the top.
+  const lockedAt = useRef(0)
   const onLock = useCallback((locked: boolean) => {
-    if (locked) smooth?.stop()
-    else smooth?.start()
-    document.documentElement.style.overflow = locked ? 'hidden' : ''
+    if (locked) {
+      lockedAt.current = window.scrollY
+      smooth?.stop()
+      return
+    }
+    const y = lockedAt.current
+    if (Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y)
+    smooth?.start()
+    smooth?.scrollTo(y, { immediate: true, force: true })
   }, [])
 
   useEffect(() => {
@@ -350,7 +357,6 @@ function Work() {
           </article>
         ))}
       </div>
-      <Activity />
     </section>
   )
 }

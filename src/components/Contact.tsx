@@ -22,6 +22,7 @@ export function ContactDialog({ onLock }: { onLock: (locked: boolean) => void })
   const [state, setState] = useState<State>('idle')
   const [error, setError] = useState('')
   const panel = useRef<HTMLDivElement>(null)
+  const root = useRef<HTMLDivElement>(null)
   const back = useRef<HTMLElement | null>(null)
   const title = useId()
 
@@ -56,6 +57,17 @@ export function ContactDialog({ onLock }: { onLock: (locked: boolean) => void })
       back.current?.focus({ preventScroll: true })
     }, 380)
   }
+
+  // Touch scrolling outside the form must not move the page underneath.
+  useEffect(() => {
+    const el = root.current
+    if (!mounted || !el) return
+    const onMove = (e: TouchEvent) => {
+      if (!panel.current?.contains(e.target as Node)) e.preventDefault()
+    }
+    el.addEventListener('touchmove', onMove, { passive: false })
+    return () => el.removeEventListener('touchmove', onMove)
+  }, [mounted])
 
   useEffect(() => {
     if (!mounted) return
@@ -96,7 +108,7 @@ export function ContactDialog({ onLock }: { onLock: (locked: boolean) => void })
   const label = 'font-mono text-[11px] font-semibold tracking-[.1em] text-teal-2 uppercase'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6" data-lenis-prevent>
+    <div ref={root} className="fixed inset-0 z-50 flex items-end justify-center overscroll-contain sm:items-center sm:p-6" data-lenis-prevent>
       <div
         aria-hidden
         onClick={close}
@@ -111,7 +123,7 @@ export function ContactDialog({ onLock }: { onLock: (locked: boolean) => void })
           shown ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-10 scale-[.97] opacity-0'
         }`}
       >
-        <button type="button" onClick={close} aria-label="Close" className="absolute top-4 right-4 cursor-pointer border-0 bg-transparent p-1.5 text-ink transition-[rotate,color] duration-300 hover:rotate-90 hover:text-teal">
+        <button type="button" onClick={close} aria-label="Close" className="absolute top-4 right-4 z-10 cursor-pointer border-0 bg-transparent p-1.5 text-ink transition-[rotate,color] duration-300 hover:rotate-90 hover:text-teal">
           <X size={22} strokeWidth={1.75} />
         </button>
 
