@@ -90,12 +90,14 @@ const clamp = (v: number) => (v < 0 ? 0 : v > 0.9999 ? 0.9999 : v)
 const HERO = new Uint32Array(['#e2d8c4', '#c9c0ad', '#2f8f8a', '#22706c'].map(pixel))
 
 // The hero: slow teal water under a cream sky. `phase` (0–1) is how far the contact
-// section has scrolled in, which pulls the water up.
-export function drawHero(c: Layer, t: number, phase: number, px: number) {
+// section has scrolled in, which pulls the water up. `energy` (0–1) is how much music is
+// playing: rings spread through the water from `origin` (where the song is shown, as shares of
+// the canvas's width and height). At 0 the water is exactly as without music.
+export function drawHero(c: Layer, t: number, phase: number, px: number, energy = 0, origin: [number, number] = [0, 1]) {
   const s = surface(c, px)
   if (!s) return false
   const { ctx, img, buf, w, h, W, H } = s
-  const key = `${t.toFixed(3)}|${phase.toFixed(2)}`
+  const key = `${t.toFixed(3)}|${phase.toFixed(2)}|${energy.toFixed(3)}`
   if (c._key === key) return true
   c._key = key
   const n = HERO.length - 1
@@ -109,6 +111,12 @@ export function drawHero(c: Layer, t: number, phase: number, px: number) {
   const [s2, c2] = columns(w, us, 15.3, -t * 0.22)
   const [s3, c3] = columns(w, us, 25, t * 0.3)
   const v = new Float32Array(w)
+  // Rings: distance from the origin in screen heights, per column (squared) and per row.
+  const rings = energy > 0.002
+  const dx2 = new Float32Array(rings ? w : 0)
+  for (let x = 0; x < dx2.length; x++) dx2[x] = ((x / w - origin[0]) * asp) ** 2
+  const amp = 0.17 * energy
+  const tr = t * 2.6
   for (let y = 0; y < h; y++) {
     const v0 = y / h
     const base = 0.05 + v0 - 0.2 * ph2 + 0.6 * ph2 * Math.max(0, v0 - 0.45) + 0.07 * Math.sin(v0 * 3.7 - t * 0.09)
@@ -119,6 +127,15 @@ export function drawHero(c: Layer, t: number, phase: number, px: number) {
     const rs3 = 0.04 * Math.sin(v0 * 25)
     const rc3 = 0.04 * Math.cos(v0 * 25)
     for (let x = 0; x < w; x++) v[x] = base + sx[x] + s1[x] * rc1 + c1[x] * rs1 + s2[x] * rc2 + c2[x] * rs2 + s3[x] * rc3 + c3[x] * rs3
+    if (rings) {
+      const dy2 = (v0 - origin[1]) ** 2
+      for (let x = 0; x < w; x++) {
+        const d = Math.sqrt(dx2[x] + dy2)
+        // Mostly lighter rings, so they show in the deep water too. They grow a little away from
+        // the song and fade out towards the far side.
+        v[x] += (amp * (Math.sin(d * 20 - tr) - 0.55) * d) / (0.12 + d * d * 1.4)
+      }
+    }
     ditherRow(buf, y * w, w, (y & 7) * 8, v, HERO, n)
   }
   ctx.putImageData(img, 0, 0)

@@ -20,7 +20,7 @@ function run() {
       l.W = W
       l.H = H
       l.top = top
-      if (l.hero) drawHero(l, f.t, f.phase, f.px)
+      if (l.hero) drawHero(l, f.t, f.phase, f.px, f.energy, f.origin)
       else drawBand(l, f.t, f.vh, f.px)
     }
   }

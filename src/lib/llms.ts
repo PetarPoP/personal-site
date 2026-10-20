@@ -35,7 +35,7 @@ export function llmsIndex() {
     '',
     '## Optional',
     '',
-    `- ${md('Now playing', `${site.url}/#music`)}: what Petar is listening to on Spotify right now (live, so not in these files)`,
+    `- ${md('Now playing', `${site.url}/`)}: what Petar is listening to on Spotify right now, at the bottom of the landing panel (live, so not in these files)`,
     '',
   ].join('\n')
 }
@@ -87,7 +87,7 @@ export function llmsText() {
     '',
     '## Also on the site',
     '',
-    `- What Petar is listening to on Spotify right now (live, so not included here): ${md(`${site.url}/#music`, `${site.url}/#music`)}`,
+    `- What Petar is listening to on Spotify right now (live, so not included here): ${md(`${site.url}/`, `${site.url}/`)}`,
     '',
   ].join('\n')
 }

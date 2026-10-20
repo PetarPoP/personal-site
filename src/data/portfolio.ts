@@ -22,42 +22,20 @@ export type ProjectKind = 'embedded' | 'web' | 'iot'
 export const projectKinds: Record<ProjectKind, string> = { embedded: 'Embedded', web: 'Web', iot: 'IoT' }
 
 // `repo` is the repository's name under profile.github, for projects whose code is public.
-export type Project = { name: string; kind: ProjectKind; stack: string; desc: string; repo?: string }
+// `nameHr` is the name on the Croatian CV when it differs.
+export type Project = { name: string; nameHr?: string; kind: ProjectKind; stack: string; desc: string; repo?: string }
 
-// "Key projects" from the CV.
+// Projects with a public repo are ranked live by how recent and how big their code is
+// (src/lib/projects.ts), and any new public repo joins the list on its own. This order is only
+// what the page shows before GitHub answers.
 export const projects: Project[] = [
   {
-    name: 'Steering-wheel CAN node',
-    kind: 'embedded',
-    stack: 'C · STM32F4 · CAN',
-    desc: 'Firmware for the race car steering wheel, talking to the rest of the car over CAN.',
-  },
-  {
-    name: 'BMS node simulation',
-    kind: 'embedded',
-    stack: 'Arduino · CAN',
-    desc: 'A stand-in battery management node for testing CAN communication on the bench.',
-  },
-  {
-    name: 'FESB Racing website',
+    name: 'This website',
+    nameHr: 'Ova web stranica',
     kind: 'web',
-    stack: 'TanStack Start · React · TS',
-    desc: 'Website for the FESB Racing Formula Student team.',
-    repo: 'fesb-racing-site',
-  },
-  {
-    name: 'OBD BLE monitor',
-    kind: 'embedded',
-    stack: 'C · ESP32 · React Native',
-    desc: 'Car diagnostics read over OBD and streamed to a phone over Bluetooth LE.',
-    repo: 'esp32-obd',
-  },
-  {
-    name: 'STM32 embedded tasks',
-    kind: 'embedded',
-    stack: 'C · STM32 · Wokwi',
-    desc: 'Embedded programming exercises on STM32, simulated in Wokwi.',
-    repo: 'FESB_racing',
+    stack: 'TanStack Start · React · Cloudflare Workers',
+    desc: 'My portfolio: a dithered canvas drawn in a Web Worker, live Spotify and GitHub data, and a CV built on every download.',
+    repo: 'personal-site',
   },
   {
     name: 'IdeaPlanner',
@@ -67,23 +45,64 @@ export const projects: Project[] = [
     repo: 'IdeaPlanner',
   },
   {
-    name: 'Smart city model',
-    kind: 'iot',
-    stack: 'C · ESP32 · Arduino',
-    desc: 'A working scale model of a smart city, driven by microcontrollers.',
+    name: 'OBD BLE monitor',
+    kind: 'embedded',
+    stack: 'C · ESP32 · React Native',
+    desc: 'Car diagnostics read over OBD and streamed to a phone over Bluetooth LE.',
+    repo: 'esp32-obd',
+  },
+  {
+    name: 'FESB Racing website',
+    nameHr: 'FESB Racing web stranica',
+    kind: 'web',
+    stack: 'TanStack Start · React · TS',
+    desc: 'Website for the FESB Racing Formula Student team.',
+    repo: 'fesb-racing-site',
+  },
+  {
+    name: 'STM32 embedded tasks',
+    nameHr: 'STM32 ugradbeni zadaci',
+    kind: 'embedded',
+    stack: 'C · STM32 · Wokwi',
+    desc: 'Embedded programming exercises on STM32, simulated in Wokwi.',
+    repo: 'FESB_racing',
   },
   {
     name: 'Café web app',
+    nameHr: 'Web aplikacija za kafić',
     kind: 'web',
     stack: 'React · Express · MongoDB',
     desc: 'Full-stack web app for a coffee shop.',
     repo: 'coffe-page',
   },
+  // No public code, so always last, in the order Pop chose.
+  {
+    name: 'BMS node simulation',
+    nameHr: 'Simulacija BMS čvora',
+    kind: 'embedded',
+    stack: 'Arduino · CAN',
+    desc: 'A stand-in battery management node for testing CAN communication on the bench.',
+  },
   {
     name: 'Student jobs portal',
+    nameHr: 'Portal za studentske poslove',
     kind: 'web',
     stack: 'React',
     desc: 'Job board connecting students with part-time work.',
+  },
+  {
+    name: 'Steering-wheel CAN node',
+    nameHr: 'CAN čvor volana',
+    kind: 'embedded',
+    stack: 'C · STM32F4 · CAN',
+    desc: 'Firmware for the race car steering wheel, talking to the rest of the car over CAN.',
+  },
+  {
+    name: 'Smart city model',
+    nameHr: 'Maketa pametnog grada',
+    kind: 'iot',
+    stack: 'C · ESP32 · Arduino',
+    desc: 'A working scale model of a smart city, driven by microcontrollers.',
   },
 ]
 

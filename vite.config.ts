@@ -6,7 +6,7 @@ import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // The page is rendered to static HTML at build time and served by Cloudflare as a plain
-// file. The Worker only runs for server functions (Spotify, GitHub, photos) and /api/photos/<id>.
+// file. The Worker only runs for server functions (Spotify, GitHub, photos) , /api/photos/<id> and the CV PDFs, which are built per download (src/lib/cv).
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
   plugins: [

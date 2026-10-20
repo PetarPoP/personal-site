@@ -1,8 +1,9 @@
 # Petar Popović — portfolio
 
 Personal CV / portfolio site built with [TanStack Start](https://tanstack.com/start) and Tailwind CSS v4.
-It is one scrolling page: a hero whose dithered teal "water" grows to fill the screen as you scroll, then Work
-(the CV's key projects, filterable), Experience, what Petar is listening to on Spotify, and Contact, with dithered
+It is one scrolling page: a hero whose dithered teal "water" grows to fill the screen as you scroll (with what Petar
+is listening to on Spotify at its bottom; the water speeds up and ripples while a song plays), then Work (every
+public project, ranked, plus a small GitHub activity graph), Experience, and Contact (a form that emails Petar), with dithered
 bands blending each section into the next. Wheel scrolling is smoothed with [Lenis](https://github.com/darkroomengineering/lenis)
 and the scrollbar is hidden. It works the same on phones; the dither uses bigger pixels there.
 
@@ -19,8 +20,8 @@ npm run deploy   # build and `wrangler deploy`
 The site runs on Cloudflare Workers with static assets (`wrangler.jsonc`, `@cloudflare/vite-plugin`). The page is
 prerendered to `index.html` at build time, and so are `sitemap.xml` and `robots.txt`. Cloudflare serves those files
 without running the Worker, which keeps them free and unlimited. The Worker only runs for the server functions
-(Spotify, and the photo list) and `/api/photos/<id>`. The Spotify section asks only while it is on screen, every 30
-seconds, and the answer is shared by all visitors for 15 seconds.
+(Spotify, GitHub, the contact form, the photo list), `/api/photos/<id>` and the two CVs. The Spotify strip asks only while
+it is on screen, every 30 seconds, and the answer is shared by all visitors for 15 seconds.
 
 With the repo connected in Cloudflare → Workers & Pages (Workers Builds):
 
@@ -29,7 +30,12 @@ With the repo connected in Cloudflare → Workers & Pages (Workers Builds):
   `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REFRESH_TOKEN`, `GITHUB_TOKEN`, `IMMICH_SHARE_URL`. PR previews
   (`wrangler preview`) don't get them; add them with `npx wrangler preview base-config secret put NAME` if wanted.
 - Storage is the Cloudflare D1 database `personal-site`, bound as `DB` (previews use `personal-site-preview`). It only
-  keeps the newest Spotify refresh token (table `kv`, created on first use).
+  keeps the newest Spotify refresh token (table `kv`) and contact form messages (table `messages`), both created on
+  first use.
+- Contact form email: in Cloudflare → Email Service → Email Routing, enable routing for `petarpopovic.com` and add
+  `petarpopovic0712@gmail.com` as a destination address (click the link in the verification email). The Worker sends
+  each message from `contact@petarpopovic.com` to that address through the `MAIL` binding, free on the Workers free
+  plan. Messages are also saved in D1, so nothing is lost if email isn't set up yet.
 - Domains: add `petarpopovic.com` (and `www`) under the Worker's Settings → Domains & Routes → Custom domain. For
   `petarpop.com`, add the domain to Cloudflare and create a Redirect Rule sending every request to
   `https://petarpopovic.com` with the same path, status 301. `src/lib/seo.ts` has the canonical address used in links,
@@ -53,14 +59,20 @@ redirect to the matching section via `public/_redirects`.
 ## Where things live
 
 - `src/data/portfolio.ts` — all copy: profile, projects, experience and education.
-- `src/components/Site.tsx` — the page and its scroll effects; `src/components/Spotify.tsx` — the now-playing player
-  (cover dithered into the teal palette); `src/components/Photos.tsx` — the photo grid and viewer (not on the page
+- `src/components/Site.tsx` — the page and its scroll effects; `src/components/Spotify.tsx` — the now-playing strip
+  on the hero; `src/components/Contact.tsx` — the contact form; `src/components/Activity.tsx` — the GitHub graph;
+  `src/components/Photos.tsx` — the photo grid and viewer (not on the page
   right now).
-- `src/lib/github.ts` — server function that lists the public GitHub repos with `GITHUB_TOKEN` (no scopes needed);
-  a project card links to its `repo` (set in `portfolio.ts`) only while that repo is public.
+- `src/lib/github.ts` — server functions for the public GitHub repos (with their code size per language) and the
+  contribution graph, with `GITHUB_TOKEN` (no scopes needed). `src/lib/projects.ts` ranks the projects: public repos
+  first, scored by how much code they have and how recently they were pushed; a new public repo joins on its own,
+  named from GitHub (add it to `portfolio.ts` to give it a better name and description). Projects without public
+  code stay at the end in `portfolio.ts` order. `GITHUB_MOCK=1` in `.dev.vars` uses made-up data locally.
 - `src/lib/spotify.ts` — server function that asks Spotify; `src/lib/db.ts` — the D1 key/value table.
 - `src/lib/dither.ts` — the ordered-dither drawing for the hero and the bands.
-- `public/petar-popovic-cv-en.pdf`, `public/petar-popovic-cv-hr.pdf` — the CVs linked from Contact.
+- `/petar-popovic-cv-en.pdf`, `/petar-popovic-cv-hr.pdf` — the CVs, built by the Worker on each download
+  (`src/lib/cv/`: copy in `src/data/cv.ts`, layout in `render.ts`, a small PDF writer in `pdf.ts`) with the nine
+  best-ranked projects. The Archivo fonts are prepared by `scripts/cv-fonts.py` into `src/lib/cv/fonts.gen.ts`.
 - `src/styles.css` — palette (`@theme` tokens) and utilities.
 
 ## Spotify
