@@ -65,12 +65,15 @@ export function renderCv(lang: CvLang, ranked: RankedProject[]) {
   // Header
   pdf.text(c.kicker, L, 48.5, F.bold, 7.5, red, 1.2)
   profile.name.split(' ').forEach((part, i) => pdf.text(part, L, 90 + i * 36.5, F.extrabold, 40, ink, -1))
+  // Six rows, 13.7 apart, ending just above the rule: place, two phones, mail, site, code.
   const cx = 402
-  pdf.text(c.location, cx, 73, F.bold, 9, ink)
-  c.phones.forEach((p, i) => pdf.text(p, cx, 86.7 + i * 13.7, F.regular, 9, ink))
-  linked(profile.email, cx, 114.1, 9, `mailto:${profile.email}`)
-  const gh = profile.github.replace(/^https?:\/\//, '')
-  linked(gh, cx, 127.8, 9, profile.github)
+  const row = (i: number) => 59.3 + i * 13.7
+  const bare = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/+$/, '')
+  pdf.text(c.location, cx, row(0), F.bold, 9, ink)
+  c.phones.forEach((p, i) => pdf.text(p, cx, row(1 + i), F.regular, 9, ink))
+  linked(profile.email, cx, row(3), 9, `mailto:${profile.email}`)
+  linked(bare(profile.site), cx, row(4), 9, profile.site)
+  linked(bare(profile.github), cx, row(5), 9, profile.github)
   pdf.line(L, 147, R, 147, 2.6, rule)
 
   const summaryEnd = para(c.summary, L, 174, 395, F.regular, 11, 16.8)
@@ -129,7 +132,8 @@ export function renderCv(lang: CvLang, ranked: RankedProject[]) {
     for (const { p, x, stack, name } of cells) {
       name.forEach((n, i) => pdf.text(n, x, rowY + i * 12, F.bold, 9.5, ink))
       stack.forEach((s, i) => rightText(s, x + colW, rowY + i * 10.6, F.regular, 7.5))
-      if (p.url) pdf.link(x, rowY - 9.5, colW, name.length * 12 + 3, p.url)
+      const link = p.live ?? p.url
+      if (link) pdf.link(x, rowY - 9.5, colW, name.length * 12 + 3, link)
     }
     lastRule = rowY + (lines - 1) * 12 + 7
     cells.forEach(({ x }) => pdf.line(x, lastRule, x + colW, lastRule, 0.6, hair))

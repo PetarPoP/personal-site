@@ -6,6 +6,7 @@ export const profile = {
   location: 'Split, Croatia',
   email: 'petarpopovic0712@gmail.com',
   github: 'https://github.com/PetarPoP',
+  site: 'https://petarpopovic.com',
   linkedin: 'https://www.linkedin.com/in/petarpop',
   // Pop's other public profiles; search engines use them to tie the site to his name.
   profiles: ['https://www.instagram.com/pop_2110/', 'https://www.instagram.com/pop.perspektiva/'],
@@ -23,20 +24,22 @@ export type ProjectKind = 'embedded' | 'web' | 'iot'
 export const projectKinds: Record<ProjectKind, string> = { embedded: 'Embedded', web: 'Web', iot: 'IoT' }
 
 // `repo` is the repository's name under profile.github, for projects whose code is public.
-// `nameHr` is the name on the Croatian CV when it differs.
-export type Project = { name: string; nameHr?: string; kind: ProjectKind; stack: string; desc: string; repo?: string }
+// `nameHr` is the name on the Croatian CV when it differs. `live` is the site itself, and
+// `preview` a screenshot of it in public/previews.
+export type Project = { name: string; nameHr?: string; kind: ProjectKind; stack: string; desc: string; repo?: string; live?: string; preview?: string }
 
 // Projects with a public repo are ranked live by how recent and how big their code is
 // (src/lib/projects.ts), and any new public repo joins the list on its own. This order is only
 // what the page shows before GitHub answers.
 export const projects: Project[] = [
   {
-    name: 'This website',
-    nameHr: 'Ova web stranica',
+    // Named by its address, not "this website": the CV is read on its own, away from the site.
+    name: 'petarpopovic.com',
     kind: 'web',
     stack: 'TanStack Start · React · Cloudflare Workers',
-    desc: 'My portfolio: a dithered canvas drawn in a Web Worker, live Spotify and GitHub data, and a CV built on every download.',
+    desc: 'This portfolio: a dithered canvas drawn in a Web Worker, live Spotify and GitHub data, and a CV built on every download.',
     repo: 'personal-site',
+    live: 'https://petarpopovic.com',
   },
   {
     name: 'IdeaPlanner',
@@ -59,6 +62,27 @@ export const projects: Project[] = [
     stack: 'TanStack Start · React · TS',
     desc: 'Website for the FESB Racing Formula Student team.',
     repo: 'fesb-racing-site',
+    live: 'https://fesb-racing-site.pop-sites.workers.dev',
+    preview: '/previews/fesb-racing.webp',
+  },
+  {
+    name: 'Midnight Crew',
+    nameHr: 'Midnight Crew',
+    kind: 'web',
+    stack: 'TanStack Start · React · TS',
+    desc: 'Website for the Midnight Crew car club.',
+    repo: 'midnight-crew-site',
+    live: 'https://midnight-crew-site.pop-sites.workers.dev',
+    preview: '/previews/midnight-crew.webp',
+  },
+  {
+    name: 'Zlatarna Popović',
+    kind: 'web',
+    stack: 'TanStack Start · React · TS',
+    desc: 'Website for the family jewellery shop in Livno.',
+    repo: 'zlatarna-popovic',
+    live: 'https://zlatarna-popovic.pop-sites.workers.dev',
+    preview: '/previews/zlatarna-popovic.webp',
   },
   {
     name: 'STM32 embedded tasks',
@@ -89,7 +113,9 @@ export const projects: Project[] = [
     nameHr: 'Portal za studentske poslove',
     kind: 'web',
     stack: 'React',
-    desc: 'Job board connecting students with part-time work.',
+    desc: 'Job board connecting students with part-time work, built at Kibernetika for the Split student centre.',
+    live: 'https://www.scst.unist.hr/student/za-studente/ponuda-poslova',
+    preview: '/previews/scst-jobs.webp',
   },
   {
     name: 'Steering-wheel CAN node',
