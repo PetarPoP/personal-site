@@ -334,12 +334,13 @@ function Work() {
       </div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] gap-x-[clamp(32px,4vw,56px)] gap-y-[clamp(36px,5vw,72px)]">
         {shown.map((p) => (
-          <article key={p.name} className="rise flex flex-col gap-3">
+          <article key={p.name} className="rise flex h-full flex-col gap-3">
             <span className={`text-sm font-medium ${p.kind === 'iot' ? 'text-coral-2' : 'text-teal-2'}`}>{projectKinds[p.kind]}</span>
             <h3 className="m-0 text-[clamp(24px,2.2vw,32px)] leading-[1.05] font-semibold tracking-[-.03em]">{p.name}</h3>
             <p className="m-0 text-base leading-normal text-pretty text-muted">{p.desc}</p>
             <span className="text-sm text-muted/80">{p.stack}</span>
-            <Code project={p} />
+            <Links project={p} />
+            <Shot project={p} />
           </article>
         ))}
       </div>
@@ -347,19 +348,50 @@ function Work() {
   )
 }
 
-function Code({ project: p }: { project: RankedProject }) {
-  if (!p.repo) return null
+// A screenshot of the project, where one is in public/previews. It sits at the foot of the
+// card (cards in a row are the same height, so the shots line up) in a fixed 16:10 box, so
+// nothing moves while the images load.
+function Shot({ project: p }: { project: RankedProject }) {
+  if (!p.preview) return null
+  const img = (
+    <img
+      src={p.preview}
+      alt={`The ${p.name} home page`}
+      width={640}
+      height={400}
+      loading="lazy"
+      decoding="async"
+      className="block aspect-16/10 w-full object-cover object-top transition-[scale] duration-500 ease-out group-hover/shot:scale-[1.04]"
+    />
+  )
+  const frame = 'group/shot mt-auto block overflow-clip rounded-xs border border-ink/15 bg-stone/40'
+  return p.live ? (
+    <a href={p.live} target="_blank" rel="noreferrer" aria-label={`Open ${p.name}`} className={frame}>
+      {img}
+    </a>
+  ) : (
+    <div className={frame}>{img}</div>
+  )
+}
+
+function Links({ project: p }: { project: RankedProject }) {
+  const style = 'flex items-center gap-1 text-[15px] font-medium text-ink underline decoration-1 underline-offset-4 transition-colors hover:text-teal'
+  const repo = p.repo ? (p.url ?? `${profile.github.replace(/\/+$/, '')}/${p.repo}`) : undefined
+  if (!repo && !p.live) return null
   return (
     <span className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      <a
-        href={p.url ?? `${profile.github.replace(/\/+$/, '')}/${p.repo}`}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center gap-1 text-[15px] font-medium text-ink underline decoration-1 underline-offset-4 transition-colors hover:text-teal"
-      >
-        Code on GitHub
-        <ArrowUpRight size={16} strokeWidth={1.75} />
-      </a>
+      {p.live && (
+        <a href={p.live} target="_blank" rel="noreferrer" className={style}>
+          Visit site
+          <ArrowUpRight size={16} strokeWidth={1.75} />
+        </a>
+      )}
+      {repo && (
+        <a href={repo} target="_blank" rel="noreferrer" className={style}>
+          Code on GitHub
+          <ArrowUpRight size={16} strokeWidth={1.75} />
+        </a>
+      )}
       {p.pushed && <span className="text-sm text-muted/80">updated {month(p.pushed)}</span>}
     </span>
   )
@@ -377,6 +409,9 @@ function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement
     ],
     profile.cvs.map((c) => ({ label: c.label, href: c.href, onClick: undefined })),
   ]
+  // Everything but the mail link opens in its own tab, the CVs included: a PDF in this tab
+  // would replace the page.
+  const away = (href: string) => (href.startsWith('mailto:') ? {} : { target: '_blank' as const, rel: 'noreferrer' })
   return (
     // Top padding = the space from Work to "Where I've been" (sand padding + band), so the
     // headings are evenly spaced. overflow-clip, not hidden: a hidden box can still be scrolled by
@@ -398,7 +433,7 @@ function Contact({ footRef, markRef }: { footRef: React.RefObject<HTMLDivElement
                   key={l.label}
                   href={l.href}
                   onClick={l.onClick}
-                  {...(l.href.startsWith('http') ? { target: '_blank', rel: 'noreferrer' } : {})}
+                  {...away(l.href)}
                   className="text-[clamp(20px,1.8vw,26px)] font-semibold tracking-[-.02em] text-paper underline decoration-2 underline-offset-[6px] transition-opacity hover:opacity-70"
                 >
                   {l.label}
