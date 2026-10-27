@@ -63,6 +63,7 @@ export const projects: Project[] = [
     desc: 'Website for the FESB Racing Formula Student team.',
     repo: 'fesb-racing-site',
     live: 'https://fesb-racing-site.pop-sites.workers.dev',
+    preview: '/previews/fesb-racing.webp',
   },
   {
     name: 'Midnight Crew',
@@ -72,6 +73,7 @@ export const projects: Project[] = [
     desc: 'Website for the Midnight Crew car club.',
     repo: 'midnight-crew-site',
     live: 'https://midnight-crew-site.pop-sites.workers.dev',
+    preview: '/previews/midnight-crew.webp',
   },
   {
     name: 'Zlatarna Popović',
@@ -80,6 +82,7 @@ export const projects: Project[] = [
     desc: 'Website for the family jewellery shop in Livno.',
     repo: 'zlatarna-popovic',
     live: 'https://zlatarna-popovic.pop-sites.workers.dev',
+    preview: '/previews/zlatarna-popovic.webp',
   },
   {
     name: 'STM32 embedded tasks',
@@ -112,6 +115,7 @@ export const projects: Project[] = [
     stack: 'React',
     desc: 'Job board connecting students with part-time work, built at Kibernetika for the Split student centre.',
     live: 'https://www.scst.unist.hr/student/za-studente/ponuda-poslova',
+    preview: '/previews/scst-jobs.webp',
   },
   {
     name: 'Steering-wheel CAN node',

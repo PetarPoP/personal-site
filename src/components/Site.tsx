@@ -356,7 +356,7 @@ function Shot({ project: p }: { project: RankedProject }) {
   const img = (
     <img
       src={p.preview}
-      alt={`The ${p.name} home page`}
+      alt={`Screenshot of ${p.name}`}
       width={640}
       height={400}
       loading="lazy"
