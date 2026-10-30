@@ -53,6 +53,24 @@ export function renderCv(lang: CvLang, ranked: RankedProject[]) {
     pdf.text(s, x1, y, F.extrabold, 8.5, ink, 1.3)
     pdf.line(x1, y + 8, x2, y + 8, 1.2, grey)
   }
+  // Items in a row split by small red dots, wrapping before an item that would cross x2.
+  // Returns the last line's baseline.
+  const dotted = (items: string[], x1: number, y: number, x2: number, leading = 16) => {
+    let x = x1
+    items.forEach((s, i) => {
+      const w = pdf.measure(s, F.regular, 9)
+      if (i && x + 11 + w > x2) {
+        x = x1
+        y += leading
+      } else if (i) {
+        pdf.rect(x + 4.6, y - 3.6, 1.8, 1.8, red)
+        x += 11
+      }
+      pdf.text(s, x, y, F.regular, 9, ink)
+      x += w
+    })
+    return y
+  }
   const linked = (s: string, x: number, y: number, size: number, url: string) => {
     const w = pdf.measure(s, F.regular, size)
     pdf.text(s, x, y, F.regular, size, red)
@@ -65,15 +83,16 @@ export function renderCv(lang: CvLang, ranked: RankedProject[]) {
   // Header
   pdf.text(c.kicker, L, 48.5, F.bold, 7.5, red, 1.2)
   profile.name.split(' ').forEach((part, i) => pdf.text(part, L, 90 + i * 36.5, F.extrabold, 40, ink, -1))
-  // Six rows, 13.7 apart, ending just above the rule: place, two phones, mail, site, code.
+  // Six rows, 13.7 apart, ending just above the rule: place, both phones, mail, site, code, LinkedIn.
   const cx = 402
   const row = (i: number) => 59.3 + i * 13.7
-  const bare = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/+$/, '')
+  const bare = (url: string) => url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '')
   pdf.text(c.location, cx, row(0), F.bold, 9, ink)
-  c.phones.forEach((p, i) => pdf.text(p, cx, row(1 + i), F.regular, 9, ink))
-  linked(profile.email, cx, row(3), 9, `mailto:${profile.email}`)
-  linked(bare(profile.site), cx, row(4), 9, profile.site)
-  linked(bare(profile.github), cx, row(5), 9, profile.github)
+  dotted(c.phones, cx, row(1), R)
+  linked(profile.email, cx, row(2), 9, `mailto:${profile.email}`)
+  linked(bare(profile.site), cx, row(3), 9, profile.site)
+  linked(bare(profile.github), cx, row(4), 9, profile.github)
+  linked(bare(profile.linkedin), cx, row(5), 9, profile.linkedin)
   pdf.line(L, 147, R, 147, 2.6, rule)
 
   const summaryEnd = para(c.summary, L, 174, 395, F.regular, 11, 16.8)
@@ -109,8 +128,7 @@ export function renderCv(lang: CvLang, ranked: RankedProject[]) {
   dated(c.headings.education, c.education)
   dated(c.headings.certificates, c.certificates)
   heading(c.headings.other, RIGHT, R, ry)
-  let right = ry + 24
-  c.other.forEach((o, i) => pdf.text(o, RIGHT, (right = ry + 24 + i * 20), F.regular, 9, ink))
+  const right = dotted(c.other, RIGHT, ry + 24, R)
 
   // Key projects: the nine best, row by row.
   const ky = Math.max(left + 40, right + 30)
