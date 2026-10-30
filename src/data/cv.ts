@@ -63,7 +63,7 @@ export const cv: Record<CvLang, CvCopy> = {
       { when: 'Mar. 2024 – May 2024', title: 'Digitalna Dalmacija – Junior DEV', text: 'React course, completed with highest marks' },
       { when: '2009 – 2017', title: 'English Language Course – B2', text: 'Achieved top grades' },
     ],
-    other: ['Car wash attendant, NK', 'Pizza delivery driver, Mirakul'],
+    other: ['Photographer, 2MT', 'Records clerk, Tax Administration', 'Car wash attendant, NK', 'Pizza delivery driver, Mirakul'],
     footnote: 'Code and detailed project write-ups are on my GitHub profile.',
   },
   hr: {
@@ -108,7 +108,7 @@ export const cv: Record<CvLang, CvCopy> = {
       { when: '03/2024 – 05/2024', title: 'Digitalna Dalmacija – Junior DEV', text: 'Tečaj Reacta, završen s najvišim ocjenama' },
       { when: '2009 – 2017', title: 'Tečaj engleskog jezika – B2', text: 'Postignute najviše ocjene' },
     ],
-    other: ['Djelatnik autopraonice, NK', 'Dostavljač pizza, Mirakul'],
+    other: ['Fotograf, 2MT', 'Arhivski referent, Porezna uprava', 'Djelatnik autopraonice, NK', 'Dostavljač pizza, Mirakul'],
     footnote: 'Kod i detaljni opisi projekata dostupni su na mom GitHub profilu.',
   },
 }
