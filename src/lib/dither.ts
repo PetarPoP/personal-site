@@ -37,6 +37,7 @@ export type Layer = {
   _key?: string
   _lo?: number
   _hi?: number
+  _done?: boolean
 }
 
 // Sizes the canvas backing store to its CSS box divided by `px` and returns its pixel buffer.
@@ -50,6 +51,7 @@ function surface(c: Layer, px: number) {
     canvas.height = h
     c._img = null
     c._key = undefined
+    c._done = false
   }
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null
   if (!ctx) return null
@@ -142,6 +144,14 @@ export function drawHero(c: Layer, t: number, phase: number, px: number, energy 
   return true
 }
 
+// Puts the picture on the canvas. The whole of it, not only the rows just drawn: a canvas
+// handed to a worker is shown as it was at the end of the last task, and in Firefox the rows
+// outside a dirty rectangle are lost, which left the tall canvases empty.
+function show(c: Layer, ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, img: ImageData) {
+  ctx.putImageData(img, 0, 0)
+  c._done = true
+}
+
 // A band between two sections, or a section background. The palette (comma separated, top
 // colour first) blends from one section's colour into the next with a moving
 // wave edge. data-mode="field" fills a section with a soft pattern that fades to its edges;
@@ -162,11 +172,21 @@ export function drawBand(c: Layer, t: number, vh: number, px: number) {
   // Only the rows on screen are drawn; rows drawn earlier for the same picture are kept.
   let y0 = Math.max(0, Math.floor((-r.top / H) * h))
   let y1 = Math.min(h, Math.ceil(((vh - r.top) / H) * h))
-  if (c._key === key && c._lo !== undefined && c._hi !== undefined && y0 <= c._hi && y1 >= c._lo) {
+  // The first pass after a resize covers the whole canvas: a canvas taller than the screen
+  // would otherwise keep empty rows where nobody has scrolled yet, and the section's own
+  // colour would show through them as a hard edge.
+  if (!c._done) {
+    y0 = 0
+    y1 = h
+    c._key = key
+    c._lo = 0
+    c._hi = h
+  } else if (c._key === key && c._lo !== undefined && c._hi !== undefined) {
     if (y0 >= c._lo && y1 <= c._hi) return
+    // Fill in everything between what was drawn and what is needed now, so a jump in the
+    // scroll position leaves no undrawn strip behind.
     const lo = Math.min(y0, c._lo)
     const hi = Math.max(y1, c._hi)
-    // Draw just the new part.
     if (y0 >= c._lo) y0 = c._hi
     else if (y1 <= c._hi) y1 = c._lo
     c._lo = lo
@@ -198,7 +218,7 @@ export function drawBand(c: Layer, t: number, vh: number, px: number) {
       for (let x = 0; x < w; x++) v[x] = 0.5 + lift * 1.3 + lift * (wv[x] * 1.5 + fs[x] * rc + fc[x] * rs)
       ditherRow(buf, y * w, w, (y & 7) * 8, v, P, n)
     }
-    ctx.putImageData(img, 0, 0, 0, y0, w, y1 - y0)
+    show(c, ctx, img)
     return
   }
 
@@ -220,7 +240,7 @@ export function drawBand(c: Layer, t: number, vh: number, px: number) {
       for (let x = 0; x < w; x++) v[x] = k - 0.4 * (a0[x] * r0 + s1[x] * rc1 + c1[x] * rs1 + s2[x] * rc2 + c2[x] * rs2)
       ditherRow(buf, y * w, w, (y & 7) * 8, v, P, n)
     }
-    ctx.putImageData(img, 0, 0, 0, y0, w, y1 - y0)
+    show(c, ctx, img)
     return
   }
 
@@ -250,5 +270,5 @@ export function drawBand(c: Layer, t: number, vh: number, px: number) {
     }
     ditherRow(buf, y * w, w, (y & 7) * 8, v, P, n)
   }
-  ctx.putImageData(img, 0, 0, 0, y0, w, y1 - y0)
+  show(c, ctx, img)
 }
