@@ -197,7 +197,15 @@ export function Site() {
         <Band colors="#e9dfca,#e2d8c4,#c9c0ad,#2f8f8a" tone="light,dark" className="h-[clamp(220px,44vw,700px)]" />
 
         <section data-tone="dark" className="relative flex flex-col gap-[clamp(120px,16vw,240px)] bg-deep px-[clamp(20px,6vw,110px)] py-[clamp(110px,18vw,280px)] text-paper">
-          <canvas data-dither="#2f8f8a,#22706c,#1d4f4c" data-mode="field" aria-hidden className="pixelated absolute inset-0 h-full w-full" />
+          {/* The pattern fades to the section's edges, so the gradient behind it holds the
+              teal of the bands at the top and bottom and the deep teal in between. */}
+          <canvas
+            data-dither="#2f8f8a,#22706c,#1d4f4c"
+            data-mode="field"
+            aria-hidden
+            style={{ background: 'linear-gradient(to bottom, #2f8f8a, #1d4f4c 26%, #1d4f4c 74%, #2f8f8a)' }}
+            className="pixelated absolute inset-0 h-full w-full"
+          />
           <div id="experience" className="relative z-[1] flex scroll-mt-24 flex-col gap-[clamp(40px,6vw,88px)]">
             <h2 className="heading">Where I've been</h2>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] gap-x-[clamp(32px,4vw,56px)] gap-y-[clamp(36px,5vw,72px)]">
@@ -221,9 +229,25 @@ export function Site() {
   )
 }
 
+// The same colours as a plain gradient, behind the dithered canvas: the blend between two
+// sections is then already right before the canvas has drawn, and stays right in a browser
+// that cannot draw it at all. 'none' is the first colour, transparent, over the hero.
+const fade = (colors: string) => {
+  const list = colors.split(',').map((c) => c.trim())
+  return `linear-gradient(to bottom, ${list.map((c, i) => (c === 'none' ? `${list[i + 1]}00` : c)).join(',')})`
+}
+
 // `tone` is the colour under the header in the band's top and bottom half (see Nav).
 function Band({ colors, tone, className }: { colors: string; tone: string; className: string }) {
-  return <canvas data-dither={colors} data-tone={tone} aria-hidden className={`pixelated -my-px block w-full ${className}`} />
+  return (
+    <canvas
+      data-dither={colors}
+      data-tone={tone}
+      aria-hidden
+      style={{ background: fade(colors) }}
+      className={`pixelated -my-px block w-full ${className}`}
+    />
+  )
 }
 
 function Logo({ className = '' }: { className?: string }) {
